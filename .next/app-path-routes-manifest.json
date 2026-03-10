@@ -1,0 +1,16 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/accessories/page": "/accessories",
+  "/articles/[id]/page": "/articles/[id]",
+  "/articles/page": "/articles",
+  "/dashboard/page": "/dashboard",
+  "/fabric/page": "/fabric",
+  "/import/page": "/import",
+  "/login/page": "/login",
+  "/page": "/",
+  "/reports/page": "/reports",
+  "/settings/page": "/settings",
+  "/users/page": "/users",
+  "/variants/page": "/variants"
+}

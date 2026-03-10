@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../../src/app/page.tsx"],"sourcesContent":["export default function RootPage() {\n  return null;\n}\n"],"names":[],"mappings":"8KAAe,SAAS,IACtB,OAAO,IACT"}

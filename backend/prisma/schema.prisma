@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  role          String         @default("store")
+  activityLogs  ActivityLog[]
+}
+
+model Article {
+  id               Int               @id @default(autoincrement())
+  name             String
+  collection       String
+  fabric           String
+  season           String
+  category         String            @default("General")
+  description      String?
+  costPrice        Float?
+  sellingPrice     Float?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  variants         Variant[]
+  images           Image[]
+}
+
+model Variant {
+  id        Int      @id @default(autoincrement())
+  sku       String   @unique
+  barcode   String?  @unique
+  size      String
+  type      String
+  color     String
+  quantity  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  articleId Int
+  article   Article  @relation(fields: [articleId], references: [id])
+  images    Image[]
+}
+
+model StockLedger {
+  id                Int      @id @default(autoincrement())
+  sku               String
+  movementType      String
+  qty               Int
+  purpose           String
+  note              String?
+  destination       String?
+  reference         String?
+  productionOrderId Int?
+  createdAt         DateTime @default(now())
+}
+
+model Fabric {
+  id        Int            @id @default(autoincrement())
+  name      String
+  type      String
+  color     String
+  season    String?
+  meters    Float          @default(0)
+  imageUrl  String?
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  ledger    FabricLedger[]
+}
+
+model FabricLedger {
+  id                Int      @id @default(autoincrement())
+  fabricId          Int
+  movementType      String
+  meters            Float
+  purpose           String
+  note              String?
+  component         String?
+  productionOrderId Int?
+  createdAt         DateTime @default(now())
+  fabric            Fabric   @relation(fields: [fabricId], references: [id])
+}
+
+model Accessory {
+  id        Int               @id @default(autoincrement())
+  name      String
+  category  String
+  unit      String
+  quantity  Float             @default(0)
+  imageUrl  String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  ledger    AccessoryLedger[]
+}
+
+model AccessoryLedger {
+  id           Int       @id @default(autoincrement())
+  accessoryId  Int
+  movementType String
+  quantity     Float
+  purpose      String
+  note         String?
+  createdAt    DateTime  @default(now())
+  accessory    Accessory @relation(fields: [accessoryId], references: [id])
+}
+
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   Int?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model Purpose {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  type      String   @default("general")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Image {
+  id        Int      @id @default(autoincrement())
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+  articleId Int?
+  article   Article? @relation(fields: [articleId], references: [id])
+  variantId Int?
+  variant   Variant? @relation(fields: [variantId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model RolePermission {
+  id         Int      @id @default(autoincrement())
+  role       String
+  permission String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([role, permission])
+}

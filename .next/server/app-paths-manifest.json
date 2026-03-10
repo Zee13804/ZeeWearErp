@@ -1,0 +1,16 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/accessories/page": "app/accessories/page.js",
+  "/articles/[id]/page": "app/articles/[id]/page.js",
+  "/articles/page": "app/articles/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/fabric/page": "app/fabric/page.js",
+  "/import/page": "app/import/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/reports/page": "app/reports/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/users/page": "app/users/page.js",
+  "/variants/page": "app/variants/page.js"
+}
