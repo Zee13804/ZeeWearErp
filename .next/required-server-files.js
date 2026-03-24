@@ -103,6 +103,7 @@ self.__SERVER_FILES_MANIFEST={
       "*.replit.dev",
       "*.repl.co",
       "*.replit.app",
+      "*.worf.replit.dev",
       "*.kirk.replit.dev",
       "127.0.0.1",
       "localhost"
@@ -306,7 +307,7 @@ self.__SERVER_FILES_MANIFEST={
       {
         "source": "/",
         "destination": "/login",
-        "permanent": false
+        "permanent": true
       }
     ]
   },

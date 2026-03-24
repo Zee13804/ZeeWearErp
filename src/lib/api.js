@@ -27,10 +27,24 @@ async function apiFetch(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Request timed out. Please check your connection and try again.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     if (response.status === 401 && !endpoint.startsWith("/auth/")) {
@@ -85,11 +99,25 @@ export async function apiUploadFile(endpoint, file, fieldName = "image") {
   const headers = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
+  const uploadController = new AbortController();
+  const uploadTimeout = setTimeout(() => uploadController.abort(), 60000);
+
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: uploadController.signal,
+    });
+  } catch (err) {
+    clearTimeout(uploadTimeout);
+    if (err.name === "AbortError") {
+      throw new Error("Upload timed out. Please try again with a smaller file.");
+    }
+    throw err;
+  }
+  clearTimeout(uploadTimeout);
 
   if (!response.ok) {
     if (response.status === 401) {

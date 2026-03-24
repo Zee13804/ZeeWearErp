@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     "*.replit.dev",
     "*.repl.co",
     "*.replit.app",
+    "*.worf.replit.dev",
     "*.kirk.replit.dev",
     "127.0.0.1",
     "localhost",
@@ -15,7 +16,7 @@ const nextConfig: NextConfig = {
       {
         source: "/",
         destination: "/login",
-        permanent: false,
+        permanent: true,
       },
     ];
   },
