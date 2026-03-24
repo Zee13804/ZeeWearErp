@@ -1,4 +1,5 @@
-const prisma = require('../prismaClient.js');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const generateSku = async (articleName, color, size) => {
   const artCode = articleName

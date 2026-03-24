@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const prisma = require('../prismaClient.js');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 if (!process.env.JWT_SECRET) {
   if (process.env.NODE_ENV === 'production') {

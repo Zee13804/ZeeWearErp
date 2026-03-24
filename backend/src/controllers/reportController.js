@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
-const prisma = require('../prismaClient.js');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const buildDateFilter = (dateFrom, dateTo) => {
   if (!dateFrom && !dateTo) return undefined;
