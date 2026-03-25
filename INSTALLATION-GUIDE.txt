@@ -1,0 +1,82 @@
+========================================
+  ZEE WEAR ERP - INSTALLATION GUIDE
+  (aaPanel + Ubuntu VPS)
+========================================
+
+GitHub Repo: https://github.com/Zee13804/ZeeWearErp.git
+Default Login: admin@zeewear.com / admin123
+
+========================================
+FRESH INSTALL (NAYE VPS PE)
+========================================
+
+STEP 1 - aaPanel Mein Node Project Banayein:
+  - Node > Add Node Project
+  - Path:     /www/wwwroot/zeewear.devoriatech.com
+  - Name:     ZEE-ERP
+  - Run opt:  Custom command > node server.js
+  - Port:     5000
+  - Node:     v20.20.2
+
+STEP 2 - aaPanel Terminal Mein Ye Chalayein:
+
+  export PATH=$PATH:/www/server/nodejs/v20.20.2/bin
+
+STEP 3 - Code Download aur Install:
+
+  cd /www/wwwroot/zeewear.devoriatech.com
+  git config --global --add safe.directory $(pwd)
+  git init
+  git remote add origin https://github.com/Zee13804/ZeeWearErp.git
+  git fetch origin main
+  git reset --hard origin/main
+  bash aapanel-install.sh
+
+STEP 4 - Firewall Port Kholein:
+  - aaPanel > Security > Firewall
+  - Port: 5000, Protocol: TCP, Action: Accept
+
+STEP 5 - aaPanel Mein Start Button Dabayein
+
+========================================
+UPDATE KARNA (BAAD MEIN CODE CHANGE PE)
+========================================
+
+  export PATH=$PATH:/www/server/nodejs/v20.20.2/bin
+  bash /www/wwwroot/zeewear.devoriatech.com/vps-update.sh
+
+========================================
+USEFUL COMMANDS
+========================================
+
+  # Server manually start karna:
+  cd /www/wwwroot/zeewear.devoriatech.com
+  export PATH=$PATH:/www/server/nodejs/v20.20.2/bin
+  nohup node server.js >> /tmp/zeewear.log 2>&1 &
+
+  # Logs dekhna:
+  tail -f /tmp/zeewear.log
+
+  # Server band karna:
+  pkill -f "node server.js"
+
+  # Admin user banana (agar login nahi ho raha):
+  cd /www/wwwroot/zeewear.devoriatech.com/backend
+  export PATH=$PATH:/www/server/nodejs/v20.20.2/bin
+  DATABASE_URL="file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db" node -e "const {PrismaClient}=require('@prisma/client'); const bcrypt=require('bcryptjs'); const prisma=new PrismaClient(); bcrypt.hash('admin123',10).then(h=>prisma.user.create({data:{email:'admin@zeewear.com',password:h,role:'dev'}})).then(u=>{console.log('Done:',u.email);prisma.$disconnect()}).catch(e=>console.error(e));"
+
+========================================
+DATABASE LOCATION (KABHI DELETE MAT KARNA!)
+========================================
+
+  /www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db
+
+========================================
+PORTS & URLS
+========================================
+
+  App Port:    5000
+  IP Access:   http://72.62.248.155:5000
+  Domain:      http://zeewear.devoriatech.com (DNS set hone ke baad)
+
+========================================
