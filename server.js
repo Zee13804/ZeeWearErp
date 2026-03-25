@@ -1,4 +1,9 @@
 const path = require("path");
+
+try {
+  require("dotenv").config({ path: path.join(__dirname, ".env") });
+} catch (_) {}
+
 const Module = require("module");
 
 const originalResolveFilename = Module._resolveFilename;
