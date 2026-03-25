@@ -1,6 +1,5 @@
 node_modules/
-.next/dev/
-.next/cache/
+.next/
 .cache/
 .local/
 .agents/
