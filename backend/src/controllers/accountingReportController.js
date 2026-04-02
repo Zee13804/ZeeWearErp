@@ -236,11 +236,17 @@ const getProfitLoss = async (req, res) => {
 
 const getSupplierReport = async (req, res) => {
   try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+    const purchaseDateFilter = (from || to) ? { purchaseDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {};
+    const paymentDateFilter = (from || to) ? { paymentDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {};
+
     const suppliers = await prisma.supplier.findMany({ where: { isActive: true } });
 
     const report = await Promise.all(suppliers.map(async (s) => {
-      const purchased = await prisma.supplierPurchase.aggregate({ where: { supplierId: s.id }, _sum: { totalAmount: true } });
-      const paid = await prisma.supplierPayment.aggregate({ where: { supplierId: s.id }, _sum: { amount: true } });
+      const purchased = await prisma.supplierPurchase.aggregate({ where: { supplierId: s.id, ...purchaseDateFilter }, _sum: { totalAmount: true } });
+      const paid = await prisma.supplierPayment.aggregate({ where: { supplierId: s.id, ...paymentDateFilter }, _sum: { amount: true } });
       const totalPurchased = purchased._sum.totalAmount || 0;
       const totalPaid = paid._sum.amount || 0;
       return {
@@ -249,7 +255,7 @@ const getSupplierReport = async (req, res) => {
       };
     }));
 
-    return res.json({ suppliers: report.sort((a, b) => b.balance - a.balance) });
+    return res.json({ suppliers: report.sort((a, b) => b.balance - a.balance), dateFrom: dateFrom || null, dateTo: dateTo || null });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch supplier report', details: err.message });
   }
@@ -259,8 +265,24 @@ const getSupplierReport = async (req, res) => {
 
 const getReceivableReport = async (req, res) => {
   try {
+    const { dateFrom, dateTo, status: statusFilter } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+
+    const where = {};
+    if (statusFilter === 'all') {
+      // no status filter
+    } else if (statusFilter && statusFilter !== 'outstanding') {
+      where.status = statusFilter;
+    } else {
+      where.status = { in: ['unpaid', 'partial'] };
+    }
+    if (from || to) {
+      where.invoiceDate = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+    }
+
     const invoices = await prisma.invoice.findMany({
-      where: { status: { in: ['unpaid', 'partial'] } },
+      where,
       include: { customer: { select: { name: true, phone: true } } },
       orderBy: { invoiceDate: 'desc' },
     });
@@ -278,7 +300,7 @@ const getReceivableReport = async (req, res) => {
       status: inv.status,
     }));
 
-    return res.json({ invoices: report });
+    return res.json({ invoices: report, dateFrom: dateFrom || null, dateTo: dateTo || null });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch receivable report', details: err.message });
   }
@@ -475,19 +497,25 @@ const getCollectionReport = async (req, res) => {
 
 const getAccountBalance = async (req, res) => {
   try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+    const dr = (from || to) ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : null;
+
     const accounts = await prisma.account.findMany({ where: { isActive: true } });
     const details = await Promise.all(accounts.map(async (acc) => {
       const [inflow, expOut, supOut, tIn, tOut, advOut, salOut, labOut] = await Promise.all([
-        prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
-        prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
-        prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
-        prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id }, _sum: { amount: true } }),
-        prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id }, _sum: { amount: true } }),
-        prisma.advance.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
-        prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true }, _sum: { netSalary: true } }),
-        prisma.labourPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.invoicePayment.aggregate({ where: { accountId: acc.id, ...(dr ? { paymentDate: dr } : {}) }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { accountId: acc.id, ...(dr ? { expenseDate: dr } : {}) }, _sum: { amount: true } }),
+        prisma.supplierPayment.aggregate({ where: { accountId: acc.id, ...(dr ? { paymentDate: dr } : {}) }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id, ...(dr ? { date: dr } : {}) }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id, ...(dr ? { date: dr } : {}) }, _sum: { amount: true } }),
+        prisma.advance.aggregate({ where: { accountId: acc.id, ...(dr ? { advanceDate: dr } : {}) }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true, ...(dr ? { paidAt: dr } : {}) }, _sum: { netSalary: true } }),
+        prisma.labourPayment.aggregate({ where: { accountId: acc.id, ...(dr ? { paymentDate: dr } : {}) }, _sum: { amount: true } }),
       ]);
-      const totalIn = acc.openingBalance + (inflow._sum.amount || 0) + (tIn._sum.amount || 0);
+      const openingBal = dr ? 0 : acc.openingBalance;
+      const totalIn = openingBal + (inflow._sum.amount || 0) + (tIn._sum.amount || 0);
       const totalOut = (expOut._sum.amount || 0) + (supOut._sum.amount || 0) + (tOut._sum.amount || 0)
         + (advOut._sum.amount || 0) + (salOut._sum.netSalary || 0) + (labOut._sum.amount || 0);
       return {
@@ -513,6 +541,7 @@ const getAccountBalance = async (req, res) => {
       totalBalance: Math.round(details.reduce((s, a) => s + a.balance, 0) * 100) / 100,
       totalInflow: Math.round(details.reduce((s, a) => s + a.totalInflow, 0) * 100) / 100,
       totalOutflow: Math.round(details.reduce((s, a) => s + a.totalOutflow, 0) * 100) / 100,
+      dateFrom: dateFrom || null, dateTo: dateTo || null,
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch account balance', details: err.message });
@@ -1049,6 +1078,75 @@ const getInvoiceStatus = async (req, res) => {
   }
 };
 
+// ── Supplier Ledger Report ─────────────────────────────────
+
+const getSupplierLedgerReport = async (req, res) => {
+  try {
+    const { supplierId, dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+
+    const purchaseDateFilter = (from || to) ? { purchaseDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {};
+    const paymentDateFilter = (from || to) ? { paymentDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {};
+
+    const suppliers = await prisma.supplier.findMany({
+      where: { isActive: true, ...(supplierId ? { id: parseInt(supplierId) } : {}) },
+    });
+
+    const result = await Promise.all(suppliers.map(async (s) => {
+      const [purchases, payments] = await Promise.all([
+        prisma.supplierPurchase.findMany({
+          where: { supplierId: s.id, ...purchaseDateFilter },
+          orderBy: { purchaseDate: 'asc' },
+        }),
+        prisma.supplierPayment.findMany({
+          where: { supplierId: s.id, ...paymentDateFilter },
+          include: { account: { select: { name: true } } },
+          orderBy: { paymentDate: 'asc' },
+        }),
+      ]);
+
+      const entries = [
+        ...purchases.map(p => ({
+          date: p.purchaseDate,
+          type: 'purchase',
+          description: `Purchase${p.invoiceNo ? ` — ${p.invoiceNo}` : ''}${p.description ? ` (${p.description})` : ''}`,
+          debit: p.totalAmount,
+          credit: 0,
+        })),
+        ...payments.map(p => ({
+          date: p.paymentDate,
+          type: 'payment',
+          description: `Payment${p.account ? ` via ${p.account.name}` : ''}${p.note ? ` — ${p.note}` : ''}`,
+          debit: 0,
+          credit: p.amount,
+        })),
+      ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      let runningBalance = 0;
+      const ledger = entries.map(e => {
+        runningBalance += e.debit - e.credit;
+        return { ...e, balance: Math.round(runningBalance * 100) / 100 };
+      });
+
+      const totalPurchased = purchases.reduce((s, p) => s + p.totalAmount, 0);
+      const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+
+      return {
+        supplier: { id: s.id, name: s.name, phone: s.phone },
+        totalPurchased: Math.round(totalPurchased * 100) / 100,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        balance: Math.round((totalPurchased - totalPaid) * 100) / 100,
+        ledger,
+      };
+    }));
+
+    return res.json({ suppliers: result, dateFrom: dateFrom || null, dateTo: dateTo || null });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch supplier ledger report', details: err.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getLedger,
@@ -1069,4 +1167,5 @@ module.exports = {
   getAdvanceReport,
   getLabourReport,
   getInvoiceStatus,
+  getSupplierLedgerReport,
 };

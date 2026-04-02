@@ -50,7 +50,7 @@ const accountingSubItems = [
   { label: "Overview", href: "/accounting", icon: LayoutDashboard },
   { label: "Accounts", href: "/accounting/accounts", icon: Wallet },
   { label: "Suppliers", href: "/accounting/suppliers", icon: ShoppingCart },
-  { label: "Customers", href: "/accounting/customers", icon: UserCheck },
+  { label: "Invoices", href: "/accounting/invoices", icon: UserCheck },
   { label: "Expenses", href: "/accounting/expenses", icon: Receipt },
   { label: "Employees", href: "/accounting/employees", icon: CreditCard },
   { label: "Reports", href: "/accounting/reports", icon: TrendingUp },

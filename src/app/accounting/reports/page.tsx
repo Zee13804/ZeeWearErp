@@ -12,7 +12,7 @@ import { Loader2, Download, Printer } from "lucide-react";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status" | "supplier-ledger";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -36,9 +36,15 @@ export default function AccountingReportsPage() {
   const [advanceReportFilter, setAdvanceReportFilter] = useState({ status: "all" });
   const [labourRange, setLabourRange] = useState({ from: "", to: "" });
   const [invoiceStatusRange, setInvoiceStatusRange] = useState({ from: "", to: "" });
+  const [supplierRange, setSupplierRange] = useState({ from: "", to: "" });
+  const [receivableRange, setReceivableRange] = useState({ from: "", to: "", status: "outstanding" });
+  const [balanceRange, setBalanceRange] = useState({ from: "", to: "" });
+  const [supplierLedgerFilter, setSupplierLedgerFilter] = useState({ supplierId: "", from: "", to: "" });
+  const [supplierList, setSupplierList] = useState<Array<{ id: number; name: string }>>([]);
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
+    apiGet("/accounting/suppliers").then(r => setSupplierList(r.suppliers || [])).catch(() => {});
   }, []);
 
   const load = async () => {
@@ -58,9 +64,16 @@ export default function AccountingReportsPage() {
         if (ledgerFilter.dateTo) params.set("dateTo", ledgerFilter.dateTo);
         res = await apiGet(`/accounting/reports/ledger?${params}`);
       } else if (tab === "suppliers") {
-        res = await apiGet("/accounting/reports/suppliers");
+        const params = new URLSearchParams();
+        if (supplierRange.from) params.set("dateFrom", supplierRange.from);
+        if (supplierRange.to) params.set("dateTo", supplierRange.to);
+        res = await apiGet(`/accounting/reports/suppliers?${params}`);
       } else if (tab === "receivables") {
-        res = await apiGet("/accounting/reports/receivables");
+        const params = new URLSearchParams();
+        if (receivableRange.from) params.set("dateFrom", receivableRange.from);
+        if (receivableRange.to) params.set("dateTo", receivableRange.to);
+        if (receivableRange.status !== "outstanding") params.set("status", receivableRange.status === "all" ? "all" : receivableRange.status);
+        res = await apiGet(`/accounting/reports/receivables?${params}`);
       } else if (tab === "payroll") {
         const params = new URLSearchParams();
         if (payrollFilter.month) params.set("month", payrollFilter.month);
@@ -79,7 +92,10 @@ export default function AccountingReportsPage() {
         if (collectionRange.to) params.set("dateTo", collectionRange.to);
         res = await apiGet(`/accounting/reports/collection?${params}`);
       } else if (tab === "balance") {
-        res = await apiGet("/accounting/reports/account-balance");
+        const params = new URLSearchParams();
+        if (balanceRange.from) params.set("dateFrom", balanceRange.from);
+        if (balanceRange.to) params.set("dateTo", balanceRange.to);
+        res = await apiGet(`/accounting/reports/account-balance?${params}`);
       } else if (tab === "cashflow") {
         const params = new URLSearchParams();
         if (cashFlowRange.from) params.set("dateFrom", cashFlowRange.from);
@@ -117,6 +133,12 @@ export default function AccountingReportsPage() {
         if (invoiceStatusRange.from) params.set("dateFrom", invoiceStatusRange.from);
         if (invoiceStatusRange.to) params.set("dateTo", invoiceStatusRange.to);
         res = await apiGet(`/accounting/reports/invoice-status?${params}`);
+      } else if (tab === "supplier-ledger") {
+        const params = new URLSearchParams();
+        if (supplierLedgerFilter.supplierId) params.set("supplierId", supplierLedgerFilter.supplierId);
+        if (supplierLedgerFilter.from) params.set("dateFrom", supplierLedgerFilter.from);
+        if (supplierLedgerFilter.to) params.set("dateTo", supplierLedgerFilter.to);
+        res = await apiGet(`/accounting/reports/supplier-ledger?${params}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -157,6 +179,7 @@ export default function AccountingReportsPage() {
     { key: "advance-report", label: "Advances" },
     { key: "labour-report", label: "Labour" },
     { key: "invoice-status", label: "Invoice Status" },
+    { key: "supplier-ledger", label: "Supplier Ledger" },
   ];
 
   return (
@@ -180,8 +203,7 @@ export default function AccountingReportsPage() {
           </Button>
         </div>
 
-        {(tab !== "suppliers" && tab !== "receivables" && tab !== "balance") && (
-          <div className="flex flex-wrap items-end gap-3 bg-background rounded-xl border border-border p-3 print:hidden">
+        <div className="flex flex-wrap items-end gap-3 bg-background rounded-xl border border-border p-3 print:hidden">
             {tab === "pl" && (
               <>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })} className="w-[150px]" /></div>
@@ -247,9 +269,34 @@ export default function AccountingReportsPage() {
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={tab === "labour-report" ? labourRange.to : invoiceStatusRange.to} onChange={e => tab === "labour-report" ? setLabourRange({ ...labourRange, to: e.target.value }) : setInvoiceStatusRange({ ...invoiceStatusRange, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
+            {tab === "suppliers" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={supplierRange.from} onChange={e => setSupplierRange({ ...supplierRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={supplierRange.to} onChange={e => setSupplierRange({ ...supplierRange, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
+            {tab === "receivables" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={receivableRange.from} onChange={e => setReceivableRange({ ...receivableRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={receivableRange.to} onChange={e => setReceivableRange({ ...receivableRange, to: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Status</p><Select value={receivableRange.status} onChange={val => setReceivableRange({ ...receivableRange, status: val })} options={[{ label: "Outstanding", value: "outstanding" }, { label: "All", value: "all" }, { label: "Paid", value: "paid" }]} className="w-[140px]" /></div>
+              </>
+            )}
+            {tab === "balance" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From (period)</p><Input type="date" value={balanceRange.from} onChange={e => setBalanceRange({ ...balanceRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To (period)</p><Input type="date" value={balanceRange.to} onChange={e => setBalanceRange({ ...balanceRange, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
+            {tab === "supplier-ledger" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Supplier</p><Select value={supplierLedgerFilter.supplierId} onChange={val => setSupplierLedgerFilter({ ...supplierLedgerFilter, supplierId: val })} options={[{ label: "All Suppliers", value: "" }, ...supplierList.map(s => ({ label: s.name, value: String(s.id) }))]} className="w-[180px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={supplierLedgerFilter.from} onChange={e => setSupplierLedgerFilter({ ...supplierLedgerFilter, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={supplierLedgerFilter.to} onChange={e => setSupplierLedgerFilter({ ...supplierLedgerFilter, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
           </div>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -287,6 +334,8 @@ export default function AccountingReportsPage() {
           <LabourReportComp data={data as unknown as LabourReportData} onExport={exportCSV} />
         ) : tab === "invoice-status" ? (
           <InvoiceStatusReport data={data as unknown as InvoiceStatusData} onExport={exportCSV} />
+        ) : tab === "supplier-ledger" ? (
+          <SupplierLedgerReport data={data as unknown as SupplierLedgerData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -1327,6 +1376,92 @@ function InvoiceStatusReport({ data, onExport }: { data: InvoiceStatusData; onEx
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface SupplierLedgerEntry {
+  date: string; type: string; description: string; debit: number; credit: number; balance: number;
+}
+interface SupplierLedgerSupplier {
+  supplier: { id: number; name: string; phone?: string };
+  totalPurchased: number; totalPaid: number; balance: number;
+  ledger: SupplierLedgerEntry[];
+}
+interface SupplierLedgerData {
+  suppliers: SupplierLedgerSupplier[];
+  dateFrom?: string; dateTo?: string;
+}
+
+function SupplierLedgerReport({ data, onExport }: { data: SupplierLedgerData; onExport: (rows: unknown[][], file: string) => void }) {
+  const handleExport = () => {
+    const rows: unknown[][] = [["Supplier", "Date", "Type", "Description", "Debit", "Credit", "Balance"]];
+    for (const s of data.suppliers) {
+      for (const e of s.ledger) {
+        rows.push([s.supplier.name, new Date(e.date).toLocaleDateString(), e.type, e.description, e.debit, e.credit, e.balance]);
+      }
+    }
+    onExport(rows, "supplier-ledger.csv");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">Supplier Ledger Report</h2>
+          {data.dateFrom && <p className="text-sm text-muted-foreground">{new Date(data.dateFrom).toLocaleDateString()} – {data.dateTo ? new Date(data.dateTo).toLocaleDateString() : "Today"}</p>}
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 cursor-pointer print:hidden">
+          <Download className="w-4 h-4" /> Export CSV
+        </Button>
+      </div>
+      {data.suppliers.length === 0 ? (
+        <p className="text-muted-foreground text-sm py-8 text-center">No supplier data found.</p>
+      ) : (
+        data.suppliers.map(s => (
+          <div key={s.supplier.id} className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 bg-muted/40">
+              <div>
+                <p className="font-semibold">{s.supplier.name}</p>
+                {s.supplier.phone && <p className="text-xs text-muted-foreground">{s.supplier.phone}</p>}
+              </div>
+              <div className="flex gap-6 text-sm">
+                <div className="text-right"><p className="text-xs text-muted-foreground">Purchased</p><p className="font-semibold text-rose-600">Rs {fmt(s.totalPurchased)}</p></div>
+                <div className="text-right"><p className="text-xs text-muted-foreground">Paid</p><p className="font-semibold text-emerald-600">Rs {fmt(s.totalPaid)}</p></div>
+                <div className="text-right"><p className="text-xs text-muted-foreground">Balance</p><p className={`font-bold ${s.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(s.balance)}</p></div>
+              </div>
+            </div>
+            {s.ledger.length === 0 ? (
+              <p className="text-muted-foreground text-xs py-4 text-center">No transactions in this period.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/20 border-b border-border">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
+                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Description</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Debit (Purchase)</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Credit (Payment)</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {s.ledger.map((e, i) => (
+                      <tr key={i} className="hover:bg-muted/30">
+                        <td className="px-4 py-2 text-muted-foreground">{new Date(e.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-2">{e.description}</td>
+                        <td className="px-4 py-2 text-right text-rose-600">{e.debit > 0 ? `Rs ${fmt(e.debit)}` : "—"}</td>
+                        <td className="px-4 py-2 text-right text-emerald-600">{e.credit > 0 ? `Rs ${fmt(e.credit)}` : "—"}</td>
+                        <td className={`px-4 py-2 text-right font-semibold ${e.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(e.balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))
       )}
     </div>
   );

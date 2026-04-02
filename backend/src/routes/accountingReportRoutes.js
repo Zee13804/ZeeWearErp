@@ -21,6 +21,7 @@ const {
   getAdvanceReport,
   getLabourReport,
   getInvoiceStatus,
+  getSupplierLedgerReport,
 } = require('../controllers/accountingReportController');
 
 const adminAuth = [authenticate, authorize('admin')];
@@ -44,5 +45,6 @@ router.get('/salary-sheet', ...adminAuth, getSalarySheet);
 router.get('/advance-report', ...adminAuth, getAdvanceReport);
 router.get('/labour-report', ...adminAuth, getLabourReport);
 router.get('/invoice-status', ...adminAuth, getInvoiceStatus);
+router.get('/supplier-ledger', ...adminAuth, getSupplierLedgerReport);
 
 module.exports = router;
