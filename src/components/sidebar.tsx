@@ -17,6 +17,7 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LogOut,
   Settings,
   Upload,
@@ -26,6 +27,12 @@ import {
   Sun,
   Lock,
   BookOpen,
+  Wallet,
+  ShoppingCart,
+  UserCheck,
+  Receipt,
+  CreditCard,
+  TrendingUp,
 } from "lucide-react";
 
 const navItems = [
@@ -36,8 +43,17 @@ const navItems = [
   { label: "Accessories", href: "/accessories", icon: Gem, adminOnly: false, pageKey: "accessories" },
   { label: "Reports", href: "/reports", icon: BarChart3, adminOnly: false, pageKey: "reports" },
   { label: "Import", href: "/import", icon: Upload, adminOnly: false, pageKey: "import" },
-  { label: "Accounting", href: "/accounting", icon: BookOpen, adminOnly: true, pageKey: "" },
   { label: "Users", href: "/users", icon: Users, adminOnly: true, pageKey: "" },
+];
+
+const accountingSubItems = [
+  { label: "Overview", href: "/accounting", icon: LayoutDashboard },
+  { label: "Accounts", href: "/accounting/accounts", icon: Wallet },
+  { label: "Suppliers", href: "/accounting/suppliers", icon: ShoppingCart },
+  { label: "Customers", href: "/accounting/customers", icon: UserCheck },
+  { label: "Expenses", href: "/accounting/expenses", icon: Receipt },
+  { label: "Employees", href: "/accounting/employees", icon: CreditCard },
+  { label: "Reports", href: "/accounting/reports", icon: TrendingUp },
 ];
 
 export function MobileHeader({ onToggle }: { onToggle: () => void }) {
@@ -165,8 +181,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [accountingOpen, setAccountingOpen] = useState(false);
   const { canViewPage, role } = usePermissions();
   const admin = role === "admin" || role === "dev";
+  const isAccountingActive = pathname.startsWith("/accounting");
 
   useEffect(() => {
     const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -174,6 +192,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
     setTheme(t);
     document.documentElement.setAttribute('data-theme', t);
   }, []);
+
+  useEffect(() => {
+    if (isAccountingActive) setAccountingOpen(true);
+  }, [isAccountingActive]);
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -252,6 +274,51 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
             </Link>
           );
         })}
+
+        {admin && (
+          <div>
+            <button
+              onClick={() => { if (!collapsed) setAccountingOpen(o => !o); else setAccountingOpen(true); }}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full",
+                isAccountingActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <BookOpen className="w-5 h-5 shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left">Accounting</span>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", accountingOpen ? "rotate-180" : "")} />
+                </>
+              )}
+            </button>
+            {accountingOpen && !collapsed && (
+              <div className="mt-0.5 ml-4 border-l border-sidebar-border pl-2 space-y-0.5">
+                {accountingSubItems.map((sub) => {
+                  const isSubActive = pathname === sub.href;
+                  return (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium transition-colors",
+                        isSubActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <sub.icon className="w-4 h-4 shrink-0" />
+                      <span>{sub.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="p-3 border-t border-sidebar-border space-y-0.5">
