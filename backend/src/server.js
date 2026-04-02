@@ -21,6 +21,14 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const backupRoutes = require("./routes/backupRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const permissionRoutes = require("./routes/permissionRoutes");
+
+const accountRoutes = require("./routes/accountRoutes");
+const supplierRoutes = require("./routes/supplierRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+const expenseRoutes = require("./routes/expenseRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
+const accountingReportRoutes = require("./routes/accountingReportRoutes");
+
 const { authenticate, authenticateAndEnforceReadOnly } = require("./middleware/authMiddleware");
 
 const app = express();
@@ -50,5 +58,12 @@ app.use("/dashboard", dashboardRoutes);
 app.use("/backup", authenticate, backupRoutes);
 app.use("/search", authenticate, searchRoutes);
 app.use("/permissions", permissionRoutes);
+
+app.use("/accounting/accounts", accountRoutes);
+app.use("/accounting/suppliers", supplierRoutes);
+app.use("/accounting/invoices", invoiceRoutes);
+app.use("/accounting/expenses", expenseRoutes);
+app.use("/accounting/employees", employeeRoutes);
+app.use("/accounting/reports", accountingReportRoutes);
 
 module.exports = app;

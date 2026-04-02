@@ -25,6 +25,7 @@ import {
   Moon,
   Sun,
   Lock,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -35,6 +36,7 @@ const navItems = [
   { label: "Accessories", href: "/accessories", icon: Gem, adminOnly: false, pageKey: "accessories" },
   { label: "Reports", href: "/reports", icon: BarChart3, adminOnly: false, pageKey: "reports" },
   { label: "Import", href: "/import", icon: Upload, adminOnly: false, pageKey: "import" },
+  { label: "Accounting", href: "/accounting", icon: BookOpen, adminOnly: true, pageKey: "" },
   { label: "Users", href: "/users", icon: Users, adminOnly: true, pageKey: "" },
 ];
 
