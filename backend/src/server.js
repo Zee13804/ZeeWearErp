@@ -66,4 +66,20 @@ app.use("/accounting/expenses", expenseRoutes);
 app.use("/accounting/employees", employeeRoutes);
 app.use("/accounting/reports", accountingReportRoutes);
 
+const { PrismaClient } = require('@prisma/client');
+(async () => {
+  const _prisma = new PrismaClient();
+  try {
+    const count = await _prisma.expenseCategory.count();
+    if (count === 0) {
+      const defaults = ["Material Purchase", "Labour", "Office", "Supplier Payment", "Other"];
+      await Promise.all(defaults.map(name => _prisma.expenseCategory.create({ data: { name } })));
+      console.log("[seed] Default expense categories created");
+    }
+  } catch (_e) {
+  } finally {
+    await _prisma.$disconnect();
+  }
+})();
+
 module.exports = app;
