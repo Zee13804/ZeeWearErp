@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
-import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, Printer } from "lucide-react";
 
 interface Customer { id: number; name: string; phone?: string; _count?: { invoices: number }; }
 interface Account { id: number; name: string; }
@@ -55,6 +55,7 @@ export default function InvoicesPage() {
   const [uploadingBill, setUploadingBill] = useState<number | null>(null);
   const billInputRef = useRef<HTMLInputElement>(null);
   const [billTargetId, setBillTargetId] = useState<number | null>(null);
+  const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
 
   const [customerForm, setCustomerForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [invoiceForm, setInvoiceForm] = useState({
@@ -234,6 +235,7 @@ export default function InvoicesPage() {
                             <p className="font-bold">Rs {fmt(inv.totalAmount - inv.discount)}</p>
                             {inv.paidAmount > 0 && <p className="text-xs text-emerald-600">Paid: Rs {fmt(inv.paidAmount)}</p>}
                           </div>
+                          <button onClick={() => setPrintInvoice(inv)} className="p-1.5 rounded-md hover:bg-purple-50 cursor-pointer" title="Print Invoice"><Printer className="w-3.5 h-3.5 text-purple-600" /></button>
                           <button onClick={() => openPayment(inv)} className="p-1.5 rounded-md hover:bg-green-50 cursor-pointer" title="Record Payment"><Plus className="w-3.5 h-3.5 text-green-600" /></button>
                           <button onClick={() => { setBillTargetId(inv.id); billInputRef.current?.click(); }} disabled={uploadingBill === inv.id} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer" title="Upload Bill">
                             {uploadingBill === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
@@ -376,6 +378,82 @@ export default function InvoicesPage() {
       </Dialog>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Invoice" message={`Delete invoice "${deleteTarget?.name}"? All items and payments will be deleted.`} loading={saving} />
+
+      <Dialog open={!!printInvoice} onClose={() => setPrintInvoice(null)} title={`Invoice — ${printInvoice?.invoiceNo || ""}`} className="max-w-2xl">
+        {printInvoice && (
+          <div id="print-invoice-content">
+            <div className="flex justify-end mb-4 print:hidden">
+              <Button size="sm" onClick={() => window.print()} className="gap-2 cursor-pointer"><Printer className="w-4 h-4" /> Print</Button>
+            </div>
+            <div className="border border-border rounded-xl overflow-hidden">
+              <div className="bg-primary/5 px-6 py-4 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">Zee Wear</h2>
+                    <p className="text-sm text-muted-foreground">INVOICE</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-primary">{printInvoice.invoiceNo}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(printInvoice.invoiceDate).toLocaleDateString("en-PK", { year: "numeric", month: "long", day: "numeric" })}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${statusColors[printInvoice.status] || ""}`}>{printInvoice.status}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-3 border-b border-border">
+                <p className="text-xs text-muted-foreground">Bill To</p>
+                <p className="font-semibold">{printInvoice.customer.name}</p>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30 border-b border-border">
+                  <tr>
+                    <th className="text-left px-6 py-2 font-medium text-muted-foreground">#</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Description</th>
+                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty</th>
+                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Unit Price</th>
+                    <th className="text-right px-6 py-2 font-medium text-muted-foreground">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {printInvoice.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="px-6 py-2 text-muted-foreground">{idx + 1}</td>
+                      <td className="px-4 py-2">{item.description}</td>
+                      <td className="px-4 py-2 text-right">{item.quantity}</td>
+                      <td className="px-4 py-2 text-right">Rs {fmt(item.unitPrice)}</td>
+                      <td className="px-6 py-2 text-right font-medium">Rs {fmt(item.totalPrice)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="px-6 py-3 border-t border-border bg-muted/10">
+                <div className="flex flex-col gap-1 items-end text-sm">
+                  <div className="flex gap-8"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">Rs {fmt(printInvoice.totalAmount)}</span></div>
+                  {printInvoice.discount > 0 && <div className="flex gap-8"><span className="text-muted-foreground">Discount</span><span className="font-medium text-emerald-600">- Rs {fmt(printInvoice.discount)}</span></div>}
+                  <div className="flex gap-8 text-base font-bold border-t border-border pt-1 mt-1"><span>Net Amount</span><span>Rs {fmt(printInvoice.totalAmount - printInvoice.discount)}</span></div>
+                  <div className="flex gap-8 text-emerald-600"><span>Amount Paid</span><span className="font-semibold">Rs {fmt(printInvoice.paidAmount)}</span></div>
+                  {printInvoice.totalAmount - printInvoice.discount - printInvoice.paidAmount > 0 && (
+                    <div className="flex gap-8 text-red-600 font-bold"><span>Balance Due</span><span>Rs {fmt(printInvoice.totalAmount - printInvoice.discount - printInvoice.paidAmount)}</span></div>
+                  )}
+                </div>
+              </div>
+              {printInvoice.payments.length > 0 && (
+                <div className="px-6 py-3 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Payment History</p>
+                  {printInvoice.payments.map((p, i) => (
+                    <div key={i} className="flex justify-between text-sm text-muted-foreground">
+                      <span>{new Date(p.paymentDate).toLocaleDateString()} · {p.account.name}</span>
+                      <span className="font-medium text-emerald-600">Rs {fmt(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="px-6 py-3 border-t border-border text-center text-xs text-muted-foreground">
+                Thank you for your business · Zee Wear
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </DashboardLayout>
   );
 }

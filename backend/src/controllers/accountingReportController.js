@@ -453,6 +453,380 @@ const getCollectionReport = async (req, res) => {
   }
 };
 
+// ── Account Balance Summary ────────────────────────────────
+
+const getAccountBalance = async (req, res) => {
+  try {
+    const accounts = await prisma.account.findMany({ where: { isActive: true } });
+    const details = await Promise.all(accounts.map(async (acc) => {
+      const [inflow, expOut, supOut, tIn, tOut, advOut, salOut, labOut] = await Promise.all([
+        prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.advance.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true }, _sum: { netSalary: true } }),
+        prisma.labourPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+      ]);
+      const totalIn = acc.openingBalance + (inflow._sum.amount || 0) + (tIn._sum.amount || 0);
+      const totalOut = (expOut._sum.amount || 0) + (supOut._sum.amount || 0) + (tOut._sum.amount || 0)
+        + (advOut._sum.amount || 0) + (salOut._sum.netSalary || 0) + (labOut._sum.amount || 0);
+      return {
+        id: acc.id, name: acc.name, type: acc.type,
+        openingBalance: acc.openingBalance,
+        totalInflow: Math.round(totalIn * 100) / 100,
+        totalOutflow: Math.round(totalOut * 100) / 100,
+        balance: Math.round((totalIn - totalOut) * 100) / 100,
+        breakdown: {
+          invoiceReceipts: inflow._sum.amount || 0,
+          transfersIn: tIn._sum.amount || 0,
+          expenses: expOut._sum.amount || 0,
+          supplierPayments: supOut._sum.amount || 0,
+          transfersOut: tOut._sum.amount || 0,
+          advances: advOut._sum.amount || 0,
+          salaries: salOut._sum.netSalary || 0,
+          labour: labOut._sum.amount || 0,
+        },
+      };
+    }));
+    return res.json({
+      accounts: details,
+      totalBalance: Math.round(details.reduce((s, a) => s + a.balance, 0) * 100) / 100,
+      totalInflow: Math.round(details.reduce((s, a) => s + a.totalInflow, 0) * 100) / 100,
+      totalOutflow: Math.round(details.reduce((s, a) => s + a.totalOutflow, 0) * 100) / 100,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch account balance', details: err.message });
+  }
+};
+
+// ── Cash Flow Report ───────────────────────────────────────
+
+const getCashFlow = async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    const [invoicePayments, expensesPaid, supplierPaid, advancesPaid, salariesPaid, labourPaid] = await Promise.all([
+      prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      prisma.supplierPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      prisma.advance.aggregate({ where: { advanceDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
+      prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+    ]);
+
+    const inflows = [
+      { label: 'Invoice Collections', amount: invoicePayments._sum.amount || 0 },
+    ];
+    const outflows = [
+      { label: 'Expenses', amount: expensesPaid._sum.amount || 0 },
+      { label: 'Supplier Payments', amount: supplierPaid._sum.amount || 0 },
+      { label: 'Employee Advances', amount: advancesPaid._sum.amount || 0 },
+      { label: 'Salaries', amount: salariesPaid._sum.netSalary || 0 },
+      { label: 'Labour Payments', amount: labourPaid._sum.amount || 0 },
+    ];
+    const totalIn = inflows.reduce((s, i) => s + i.amount, 0);
+    const totalOut = outflows.reduce((s, o) => s + o.amount, 0);
+
+    return res.json({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      inflows,
+      outflows,
+      totalIn,
+      totalOut,
+      netCashFlow: totalIn - totalOut,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch cash flow', details: err.message });
+  }
+};
+
+// ── Sales / Invoice Report ─────────────────────────────────
+
+const getSalesReport = async (req, res) => {
+  try {
+    const { dateFrom, dateTo, status } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    const where = { invoiceDate: { gte: from, lte: to } };
+    if (status && status !== 'all') where.status = status;
+
+    const invoices = await prisma.invoice.findMany({
+      where,
+      include: {
+        customer: { select: { name: true, phone: true } },
+        payments: { select: { amount: true, paymentDate: true, method: true } },
+      },
+      orderBy: { invoiceDate: 'desc' },
+    });
+
+    const report = invoices.map(inv => ({
+      id: inv.id,
+      invoiceNo: inv.invoiceNo,
+      invoiceDate: inv.invoiceDate,
+      customer: inv.customer.name,
+      phone: inv.customer.phone,
+      totalAmount: inv.totalAmount,
+      discount: inv.discount,
+      netAmount: inv.totalAmount - inv.discount,
+      paidAmount: inv.paidAmount,
+      balance: inv.totalAmount - inv.discount - inv.paidAmount,
+      status: inv.status,
+      paymentCount: inv.payments.length,
+    }));
+
+    const totalSales = report.reduce((s, i) => s + i.netAmount, 0);
+    const totalCollected = report.reduce((s, i) => s + i.paidAmount, 0);
+    const totalPending = report.reduce((s, i) => s + i.balance, 0);
+    const totalDiscount = report.reduce((s, i) => s + i.discount, 0);
+
+    return res.json({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      invoices: report,
+      totalSales,
+      totalCollected,
+      totalPending,
+      totalDiscount,
+      invoiceCount: report.length,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch sales report', details: err.message });
+  }
+};
+
+// ── Cost Analysis Report ───────────────────────────────────
+
+const getCostAnalysis = async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    const [expByCategory, purchases, labour, salaries, expensesList] = await Promise.all([
+      prisma.expense.groupBy({
+        by: ['categoryId'],
+        where: { expenseDate: { gte: from, lte: to } },
+        _sum: { amount: true }, _count: true,
+      }),
+      prisma.supplierPurchase.groupBy({
+        by: ['supplierId'],
+        where: { purchaseDate: { gte: from, lte: to } },
+        _sum: { totalAmount: true }, _count: true,
+      }),
+      prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true }, _count: true }),
+      prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true }, _count: true }),
+      prisma.expense.findMany({
+        where: { expenseDate: { gte: from, lte: to } },
+        include: { category: { select: { name: true } }, account: { select: { name: true } } },
+        orderBy: { expenseDate: 'desc' },
+      }),
+    ]);
+
+    const [cats, sups] = await Promise.all([
+      prisma.expenseCategory.findMany(),
+      prisma.supplier.findMany({ select: { id: true, name: true } }),
+    ]);
+    const catMap = Object.fromEntries(cats.map(c => [c.id, c.name]));
+    const supMap = Object.fromEntries(sups.map(s => [s.id, s.name]));
+
+    const totalExpenses = expByCategory.reduce((s, e) => s + (e._sum.amount || 0), 0);
+    const totalPurchases = purchases.reduce((s, p) => s + (p._sum.totalAmount || 0), 0);
+    const totalLabour = labour._sum.amount || 0;
+    const totalSalaries = salaries._sum.netSalary || 0;
+    const grandTotal = totalExpenses + totalPurchases + totalLabour + totalSalaries;
+
+    return res.json({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      grandTotal,
+      summary: [
+        { type: 'Expenses', amount: totalExpenses, pct: grandTotal > 0 ? Math.round(totalExpenses / grandTotal * 1000) / 10 : 0 },
+        { type: 'Supplier Purchases', amount: totalPurchases, pct: grandTotal > 0 ? Math.round(totalPurchases / grandTotal * 1000) / 10 : 0 },
+        { type: 'Labour', amount: totalLabour, pct: grandTotal > 0 ? Math.round(totalLabour / grandTotal * 1000) / 10 : 0 },
+        { type: 'Salaries', amount: totalSalaries, pct: grandTotal > 0 ? Math.round(totalSalaries / grandTotal * 1000) / 10 : 0 },
+      ],
+      expensesByCategory: expByCategory.map(e => ({
+        category: catMap[e.categoryId] || 'Uncategorized',
+        amount: e._sum.amount || 0,
+        count: e._count,
+        pct: totalExpenses > 0 ? Math.round((e._sum.amount || 0) / totalExpenses * 1000) / 10 : 0,
+      })).sort((a, b) => b.amount - a.amount),
+      purchasesBySupplier: purchases.map(p => ({
+        supplier: supMap[p.supplierId] || 'Unknown',
+        amount: p._sum.totalAmount || 0,
+        count: p._count,
+      })).sort((a, b) => b.amount - a.amount),
+      expenseDetails: expensesList.map(e => ({
+        date: e.expenseDate,
+        description: e.description,
+        category: e.category?.name || 'Uncategorized',
+        account: e.account?.name || '—',
+        amount: e.amount,
+        billImage: e.billImage || null,
+      })),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch cost analysis', details: err.message });
+  }
+};
+
+// ── Annual Payroll Summary ─────────────────────────────────
+
+const getAnnualPayroll = async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    const [salaries, employees, advances] = await Promise.all([
+      prisma.salaryRecord.findMany({
+        where: { year },
+        include: { employee: { select: { id: true, name: true, designation: true } } },
+        orderBy: [{ month: 'asc' }],
+      }),
+      prisma.employee.findMany({ where: { isActive: true }, select: { id: true, name: true, designation: true } }),
+      prisma.advance.findMany({
+        where: { advanceDate: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59, 999) } },
+        include: { employee: { select: { name: true } } },
+      }),
+    ]);
+
+    const byEmployee = employees.map(emp => {
+      const empSalaries = salaries.filter(s => s.employeeId === emp.id);
+      const empAdvances = advances.filter(a => a.employeeId === emp.id);
+      return {
+        employeeId: emp.id,
+        name: emp.name,
+        designation: emp.designation,
+        totalGross: empSalaries.reduce((s, r) => s + r.basicSalary, 0),
+        totalAdvanceDeducted: empSalaries.reduce((s, r) => s + r.advanceDeducted, 0),
+        totalNet: empSalaries.reduce((s, r) => s + r.netSalary, 0),
+        totalAdvancesTaken: empAdvances.reduce((s, a) => s + a.amount, 0),
+        monthsPaid: empSalaries.filter(r => r.isPaid).length,
+        months: empSalaries.map(r => ({ month: r.month, gross: r.basicSalary, deductions: r.advanceDeducted, net: r.netSalary, paid: r.isPaid })),
+      };
+    });
+
+    return res.json({
+      year,
+      employees: byEmployee,
+      totalGross: byEmployee.reduce((s, e) => s + e.totalGross, 0),
+      totalDeductions: byEmployee.reduce((s, e) => s + e.totalAdvanceDeducted, 0),
+      totalNet: byEmployee.reduce((s, e) => s + e.totalNet, 0),
+      totalAdvancesTaken: byEmployee.reduce((s, e) => s + e.totalAdvancesTaken, 0),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch annual payroll', details: err.message });
+  }
+};
+
+// ── Backend CSV Export ─────────────────────────────────────
+
+const exportCsv = async (req, res) => {
+  try {
+    const { type, dateFrom, dateTo, year, status } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    let rows = [];
+    let filename = `${type || 'report'}.csv`;
+
+    if (type === 'profit-loss') {
+      const [rev, exp, purch, lab, sal] = await Promise.all([
+        prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
+        prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
+      ]);
+      const revenue = rev._sum.amount || 0;
+      const totalExpenses = exp._sum.amount || 0;
+      const totalPurchases = purch._sum.totalAmount || 0;
+      const totalLabour = lab._sum.amount || 0;
+      const totalSalaries = sal._sum.netSalary || 0;
+      const totalCosts = totalExpenses + totalPurchases + totalLabour + totalSalaries;
+      rows = [
+        ['Item','Amount'],
+        ['Revenue', revenue],
+        ['Expenses', totalExpenses],
+        ['Supplier Purchases', totalPurchases],
+        ['Labour', totalLabour],
+        ['Salaries', totalSalaries],
+        ['Total Costs', totalCosts],
+        ['Net Profit', revenue - totalCosts],
+      ];
+      filename = `profit-loss-${from.toISOString().slice(0,10)}-${to.toISOString().slice(0,10)}.csv`;
+    } else if (type === 'sales') {
+      const invoices = await prisma.invoice.findMany({
+        where: { invoiceDate: { gte: from, lte: to }, ...(status && status !== 'all' ? { status } : {}) },
+        include: { customer: { select: { name: true, phone: true } } },
+        orderBy: { invoiceDate: 'desc' },
+      });
+      rows = [
+        ['Invoice No', 'Date', 'Customer', 'Phone', 'Amount', 'Discount', 'Net', 'Paid', 'Balance', 'Status'],
+        ...invoices.map(inv => [inv.invoiceNo, new Date(inv.invoiceDate).toLocaleDateString(), inv.customer.name, inv.customer.phone || '', inv.totalAmount, inv.discount, inv.totalAmount - inv.discount, inv.paidAmount, inv.totalAmount - inv.discount - inv.paidAmount, inv.status]),
+      ];
+      filename = `sales-${from.toISOString().slice(0,10)}-${to.toISOString().slice(0,10)}.csv`;
+    } else if (type === 'suppliers') {
+      const suppliers = await prisma.supplier.findMany({ where: { isActive: true } });
+      const report = await Promise.all(suppliers.map(async (s) => {
+        const [purchased, paid] = await Promise.all([
+          prisma.supplierPurchase.aggregate({ where: { supplierId: s.id }, _sum: { totalAmount: true } }),
+          prisma.supplierPayment.aggregate({ where: { supplierId: s.id }, _sum: { amount: true } }),
+        ]);
+        return [s.name, s.phone || '', purchased._sum.totalAmount || 0, paid._sum.amount || 0, (purchased._sum.totalAmount || 0) - (paid._sum.amount || 0)];
+      }));
+      rows = [['Supplier', 'Phone', 'Total Purchased', 'Total Paid', 'Balance Due'], ...report];
+      filename = 'supplier-balances.csv';
+    } else if (type === 'monthly-breakdown') {
+      const y = parseInt(year) || new Date().getFullYear();
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      rows = [['Month', 'Revenue', 'Expenses', 'Purchases', 'Labour', 'Salaries', 'Total Costs', 'Net P&L']];
+      for (let m = 1; m <= 12; m++) {
+        const mFrom = new Date(y, m - 1, 1);
+        const mTo = new Date(y, m, 0, 23, 59, 59, 999);
+        const [rev, exp, purch, lab, sal] = await Promise.all([
+          prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: mFrom, lte: mTo } }, _sum: { amount: true } }),
+          prisma.expense.aggregate({ where: { expenseDate: { gte: mFrom, lte: mTo } }, _sum: { amount: true } }),
+          prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: mFrom, lte: mTo } }, _sum: { totalAmount: true } }),
+          prisma.labourPayment.aggregate({ where: { paymentDate: { gte: mFrom, lte: mTo } }, _sum: { amount: true } }),
+          prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: mFrom, lte: mTo } }, _sum: { netSalary: true } }),
+        ]);
+        const revenue = rev._sum.amount || 0;
+        const totalCosts = (exp._sum.amount || 0) + (purch._sum.totalAmount || 0) + (lab._sum.amount || 0) + (sal._sum.netSalary || 0);
+        rows.push([monthNames[m-1] + ' ' + y, revenue, exp._sum.amount || 0, purch._sum.totalAmount || 0, lab._sum.amount || 0, sal._sum.netSalary || 0, totalCosts, revenue - totalCosts]);
+      }
+      filename = `monthly-breakdown-${y}.csv`;
+    } else if (type === 'payroll') {
+      const y = parseInt(year) || new Date().getFullYear();
+      const salaries = await prisma.salaryRecord.findMany({
+        where: { year: y },
+        include: { employee: { select: { name: true, designation: true } } },
+        orderBy: [{ month: 'asc' }],
+      });
+      rows = [['Employee', 'Designation', 'Month', 'Year', 'Gross', 'Advance Deducted', 'Net', 'Paid']];
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      for (const s of salaries) {
+        rows.push([s.employee.name, s.employee.designation || '', monthNames[s.month - 1], s.year, s.basicSalary, s.advanceDeducted, s.netSalary, s.isPaid ? 'Yes' : 'No']);
+      }
+      filename = `payroll-${y}.csv`;
+    } else {
+      return res.status(400).json({ error: 'Invalid report type' });
+    }
+
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to export CSV', details: err.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getLedger,
@@ -463,4 +837,10 @@ module.exports = {
   getMonthlyBreakdown,
   getExpenseSummary,
   getCollectionReport,
+  getAccountBalance,
+  getCashFlow,
+  getSalesReport,
+  getCostAnalysis,
+  getAnnualPayroll,
+  exportCsv,
 };

@@ -12,7 +12,7 @@ import { Loader2, Download, Printer } from "lucide-react";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -28,6 +28,10 @@ export default function AccountingReportsPage() {
   const [monthlyYear, setMonthlyYear] = useState(String(new Date().getFullYear()));
   const [expenseRange, setExpenseRange] = useState({ from: "", to: "" });
   const [collectionRange, setCollectionRange] = useState({ from: "", to: "" });
+  const [cashFlowRange, setCashFlowRange] = useState({ from: "", to: "" });
+  const [salesRange, setSalesRange] = useState({ from: "", to: "", status: "all" });
+  const [costsRange, setCostsRange] = useState({ from: "", to: "" });
+  const [annualPayrollYear, setAnnualPayrollYear] = useState(String(new Date().getFullYear()));
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
@@ -70,6 +74,26 @@ export default function AccountingReportsPage() {
         if (collectionRange.from) params.set("dateFrom", collectionRange.from);
         if (collectionRange.to) params.set("dateTo", collectionRange.to);
         res = await apiGet(`/accounting/reports/collection?${params}`);
+      } else if (tab === "balance") {
+        res = await apiGet("/accounting/reports/account-balance");
+      } else if (tab === "cashflow") {
+        const params = new URLSearchParams();
+        if (cashFlowRange.from) params.set("dateFrom", cashFlowRange.from);
+        if (cashFlowRange.to) params.set("dateTo", cashFlowRange.to);
+        res = await apiGet(`/accounting/reports/cash-flow?${params}`);
+      } else if (tab === "sales") {
+        const params = new URLSearchParams();
+        if (salesRange.from) params.set("dateFrom", salesRange.from);
+        if (salesRange.to) params.set("dateTo", salesRange.to);
+        if (salesRange.status !== "all") params.set("status", salesRange.status);
+        res = await apiGet(`/accounting/reports/sales?${params}`);
+      } else if (tab === "costs") {
+        const params = new URLSearchParams();
+        if (costsRange.from) params.set("dateFrom", costsRange.from);
+        if (costsRange.to) params.set("dateTo", costsRange.to);
+        res = await apiGet(`/accounting/reports/cost-analysis?${params}`);
+      } else if (tab === "annual-payroll") {
+        res = await apiGet(`/accounting/reports/annual-payroll?year=${annualPayrollYear}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -95,12 +119,17 @@ export default function AccountingReportsPage() {
   const tabs: { key: ReportTab; label: string }[] = [
     { key: "pl", label: "Profit & Loss" },
     { key: "monthly", label: "Monthly Trend" },
+    { key: "balance", label: "Account Balance" },
+    { key: "cashflow", label: "Cash Flow" },
+    { key: "sales", label: "Sales Report" },
+    { key: "costs", label: "Cost Analysis" },
     { key: "ledger", label: "General Ledger" },
     { key: "expenses", label: "Expense Summary" },
     { key: "collection", label: "Collection" },
     { key: "suppliers", label: "Suppliers" },
     { key: "receivables", label: "Receivables" },
     { key: "payroll", label: "Payroll" },
+    { key: "annual-payroll", label: "Annual Payroll" },
   ];
 
   return (
@@ -124,7 +153,7 @@ export default function AccountingReportsPage() {
           </Button>
         </div>
 
-        {(tab === "pl" || tab === "ledger" || tab === "payroll" || tab === "monthly" || tab === "expenses" || tab === "collection") && (
+        {(tab !== "suppliers" && tab !== "receivables" && tab !== "balance") && (
           <div className="flex flex-wrap items-end gap-3 bg-background rounded-xl border border-border p-3 print:hidden">
             {tab === "pl" && (
               <>
@@ -148,10 +177,32 @@ export default function AccountingReportsPage() {
             {tab === "monthly" && (
               <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={monthlyYear} onChange={e => setMonthlyYear(e.target.value)} min="2020" max="2030" className="w-[100px]" /></div>
             )}
+            {tab === "annual-payroll" && (
+              <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={annualPayrollYear} onChange={e => setAnnualPayrollYear(e.target.value)} min="2020" max="2030" className="w-[100px]" /></div>
+            )}
             {(tab === "expenses" || tab === "collection") && (
               <>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={tab === "expenses" ? expenseRange.from : collectionRange.from} onChange={e => tab === "expenses" ? setExpenseRange({ ...expenseRange, from: e.target.value }) : setCollectionRange({ ...collectionRange, from: e.target.value })} className="w-[150px]" /></div>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={tab === "expenses" ? expenseRange.to : collectionRange.to} onChange={e => tab === "expenses" ? setExpenseRange({ ...expenseRange, to: e.target.value }) : setCollectionRange({ ...collectionRange, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
+            {tab === "cashflow" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={cashFlowRange.from} onChange={e => setCashFlowRange({ ...cashFlowRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={cashFlowRange.to} onChange={e => setCashFlowRange({ ...cashFlowRange, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
+            {tab === "sales" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={salesRange.from} onChange={e => setSalesRange({ ...salesRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={salesRange.to} onChange={e => setSalesRange({ ...salesRange, to: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Status</p><Select value={salesRange.status} onChange={val => setSalesRange({ ...salesRange, status: val })} options={[{ label: "All", value: "all" }, { label: "Paid", value: "paid" }, { label: "Partial", value: "partial" }, { label: "Unpaid", value: "unpaid" }]} className="w-[120px]" /></div>
+              </>
+            )}
+            {tab === "costs" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={costsRange.from} onChange={e => setCostsRange({ ...costsRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={costsRange.to} onChange={e => setCostsRange({ ...costsRange, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
@@ -176,6 +227,16 @@ export default function AccountingReportsPage() {
           <ExpenseSummaryReport data={data as unknown as ExpenseSummaryData} onExport={exportCSV} />
         ) : tab === "collection" ? (
           <CollectionReport data={data as unknown as CollectionData} onExport={exportCSV} />
+        ) : tab === "balance" ? (
+          <AccountBalanceReport data={data as unknown as AccountBalanceData} onExport={exportCSV} />
+        ) : tab === "cashflow" ? (
+          <CashFlowReport data={data as unknown as CashFlowData} onExport={exportCSV} />
+        ) : tab === "sales" ? (
+          <SalesReport data={data as unknown as SalesData} onExport={exportCSV} />
+        ) : tab === "costs" ? (
+          <CostAnalysisReport data={data as unknown as CostAnalysisData} onExport={exportCSV} />
+        ) : tab === "annual-payroll" ? (
+          <AnnualPayrollReport data={data as unknown as AnnualPayrollData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -439,6 +500,315 @@ function PayrollReport({ data }: { data: PayrollData }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface AccountBalanceData {
+  accounts: Array<{ id: number; name: string; type: string; openingBalance: number; totalInflow: number; totalOutflow: number; balance: number; breakdown: { invoiceReceipts: number; transfersIn: number; expenses: number; supplierPayments: number; transfersOut: number; advances: number; salaries: number; labour: number } }>;
+  totalBalance: number; totalInflow: number; totalOutflow: number;
+}
+
+function AccountBalanceReport({ data, onExport }: { data: AccountBalanceData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Account", "Type", "Opening Balance", "Total Inflow", "Total Outflow", "Balance"],
+    ...data.accounts.map(a => [a.name, a.type, a.openingBalance, a.totalInflow, a.totalOutflow, a.balance]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <StatBox label="Total Balance" value={`Rs ${fmt(data.totalBalance)}`} color={data.totalBalance >= 0 ? "text-emerald-600" : "text-red-600"} />
+          <StatBox label="Total Inflow" value={`Rs ${fmt(data.totalInflow)}`} color="text-emerald-600" />
+          <StatBox label="Total Outflow" value={`Rs ${fmt(data.totalOutflow)}`} color="text-red-600" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "account-balance.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="grid gap-4">
+        {data.accounts.map(acc => (
+          <div key={acc.id} className="bg-background rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
+              <div><p className="font-semibold">{acc.name}</p><p className="text-xs text-muted-foreground capitalize">{acc.type} · Opening: Rs {fmt(acc.openingBalance)}</p></div>
+              <p className={`text-xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(acc.balance)}</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border">
+              {[
+                { label: "Invoice Receipts", v: acc.breakdown.invoiceReceipts, positive: true },
+                { label: "Transfers In", v: acc.breakdown.transfersIn, positive: true },
+                { label: "Expenses", v: acc.breakdown.expenses, positive: false },
+                { label: "Supplier Pmts", v: acc.breakdown.supplierPayments, positive: false },
+                { label: "Transfers Out", v: acc.breakdown.transfersOut, positive: false },
+                { label: "Advances", v: acc.breakdown.advances, positive: false },
+                { label: "Salaries", v: acc.breakdown.salaries, positive: false },
+                { label: "Labour", v: acc.breakdown.labour, positive: false },
+              ].map((item, i) => (
+                <div key={i} className="bg-background px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <p className={`text-sm font-semibold mt-0.5 ${item.positive ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(item.v)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface CashFlowData {
+  from: string; to: string;
+  inflows: Array<{ label: string; amount: number }>;
+  outflows: Array<{ label: string; amount: number }>;
+  totalIn: number; totalOut: number; netCashFlow: number;
+}
+
+function CashFlowReport({ data, onExport }: { data: CashFlowData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Type", "Category", "Amount"],
+    ...data.inflows.map(i => ["Inflow", i.label, i.amount]),
+    ...data.outflows.map(o => ["Outflow", o.label, o.amount]),
+    ["", "Net Cash Flow", data.netCashFlow],
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <StatBox label="Total Inflow" value={`Rs ${fmt(data.totalIn)}`} color="text-emerald-600" />
+          <StatBox label="Total Outflow" value={`Rs ${fmt(data.totalOut)}`} color="text-red-600" />
+          <StatBox label="Net Cash Flow" value={`Rs ${fmt(data.netCashFlow)}`} color={data.netCashFlow >= 0 ? "text-emerald-600" : "text-red-600"} />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "cash-flow.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-600 mb-2">Cash Inflows</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm"><tbody className="divide-y divide-border">
+              {data.inflows.map((item, i) => <tr key={i} className="hover:bg-muted/20"><td className="px-4 py-2.5">{item.label}</td><td className="px-4 py-2.5 text-right font-semibold text-emerald-600">Rs {fmt(item.amount)}</td></tr>)}
+              <tr className="bg-muted/20 border-t-2 border-border"><td className="px-4 py-2.5 font-bold">Total</td><td className="px-4 py-2.5 text-right font-bold text-emerald-600">Rs {fmt(data.totalIn)}</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-red-600 mb-2">Cash Outflows</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm"><tbody className="divide-y divide-border">
+              {data.outflows.map((item, i) => <tr key={i} className="hover:bg-muted/20"><td className="px-4 py-2.5">{item.label}</td><td className="px-4 py-2.5 text-right font-semibold text-red-600">Rs {fmt(item.amount)}</td></tr>)}
+              <tr className="bg-muted/20 border-t-2 border-border"><td className="px-4 py-2.5 font-bold">Total</td><td className="px-4 py-2.5 text-right font-bold text-red-600">Rs {fmt(data.totalOut)}</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SalesData {
+  from: string; to: string; totalSales: number; totalCollected: number; totalPending: number; totalDiscount: number; invoiceCount: number;
+  invoices: Array<{ id: number; invoiceNo: string; invoiceDate: string; customer: string; phone: string; totalAmount: number; discount: number; netAmount: number; paidAmount: number; balance: number; status: string }>;
+}
+
+function SalesReport({ data, onExport }: { data: SalesData; onExport: (rows: unknown[][], file: string) => void }) {
+  const statusColor = (s: string) => s === "paid" ? "text-emerald-600 bg-emerald-50" : s === "partial" ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
+  const csvRows = [
+    ["Invoice No", "Date", "Customer", "Amount", "Discount", "Net", "Paid", "Balance", "Status"],
+    ...data.invoices.map(inv => [inv.invoiceNo, new Date(inv.invoiceDate).toLocaleDateString(), inv.customer, inv.totalAmount, inv.discount, inv.netAmount, inv.paidAmount, inv.balance, inv.status]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          <StatBox label="Total Sales" value={`Rs ${fmt(data.totalSales)}`} color="text-foreground" />
+          <StatBox label="Collected" value={`Rs ${fmt(data.totalCollected)}`} color="text-emerald-600" />
+          <StatBox label="Pending" value={`Rs ${fmt(data.totalPending)}`} color="text-red-600" />
+          <StatBox label="Discounts" value={`Rs ${fmt(data.totalDiscount)}`} color="text-amber-600" />
+          <StatBox label="Invoices" value={String(data.invoiceCount)} color="text-blue-600" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "sales-report.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="bg-background rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 border-b border-border"><tr>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Invoice</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net Amount</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Paid</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Balance</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+          </tr></thead>
+          <tbody className="divide-y divide-border">
+            {data.invoices.map(inv => (
+              <tr key={inv.id} className="hover:bg-muted/30">
+                <td className="px-4 py-2.5 font-medium">{inv.invoiceNo}</td>
+                <td className="px-4 py-2.5">{inv.customer}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
+                <td className="px-4 py-2.5 text-right">Rs {fmt(inv.netAmount)}</td>
+                <td className="px-4 py-2.5 text-right text-emerald-600">Rs {fmt(inv.paidAmount)}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold ${inv.balance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(inv.balance)}</td>
+                <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${statusColor(inv.status)}`}>{inv.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {data.invoices.length === 0 && <p className="text-center py-10 text-muted-foreground">No invoices in this period</p>}
+      </div>
+    </div>
+  );
+}
+
+interface CostAnalysisData {
+  from: string; to: string; grandTotal: number;
+  summary: Array<{ type: string; amount: number; pct: number }>;
+  expensesByCategory: Array<{ category: string; amount: number; count: number; pct: number }>;
+  purchasesBySupplier: Array<{ supplier: string; amount: number; count: number }>;
+  expenseDetails: Array<{ date: string; description: string; category: string; account: string; amount: number; billImage: string | null }>;
+}
+
+function CostAnalysisReport({ data, onExport }: { data: CostAnalysisData; onExport: (rows: unknown[][], file: string) => void }) {
+  const [showDetails, setShowDetails] = React.useState(false);
+  const csvRows = [
+    ["Type", "Amount", "%"],
+    ...data.summary.map(s => [s.type, s.amount, s.pct + "%"]),
+    ["", "", ""],
+    ["Expense Category", "Amount", "Transactions"],
+    ...data.expensesByCategory.map(e => [e.category, e.amount, e.count]),
+    ["", "", ""],
+    ["Supplier", "Purchases", "Transactions"],
+    ...data.purchasesBySupplier.map(p => [p.supplier, p.amount, p.count]),
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <StatBox label="Total Costs" value={`Rs ${fmt(data.grandTotal)}`} color="text-red-600" />
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "cost-analysis.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="bg-background rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 border-b border-border"><tr><th className="text-left px-4 py-3 font-medium text-muted-foreground">Cost Type</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">%</th></tr></thead>
+          <tbody className="divide-y divide-border">
+            {data.summary.map((s, i) => <tr key={i} className="hover:bg-muted/30"><td className="px-4 py-2.5 font-medium">{s.type}</td><td className="px-4 py-2.5 text-right font-semibold text-red-600">Rs {fmt(s.amount)}</td><td className="px-4 py-2.5 text-right text-muted-foreground">{s.pct}%</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm font-semibold mb-2">Expenses by Category</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm"><thead className="bg-muted/30 border-b border-border"><tr><th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">%</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {data.expensesByCategory.map((e, i) => <tr key={i} className="hover:bg-muted/20"><td className="px-3 py-2">{e.category}</td><td className="px-3 py-2 text-right font-semibold">Rs {fmt(e.amount)}</td><td className="px-3 py-2 text-right text-muted-foreground">{e.pct}%</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-semibold mb-2">Purchases by Supplier</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm"><thead className="bg-muted/30 border-b border-border"><tr><th className="text-left px-3 py-2 font-medium text-muted-foreground">Supplier</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Txns</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {data.purchasesBySupplier.map((p, i) => <tr key={i} className="hover:bg-muted/20"><td className="px-3 py-2">{p.supplier}</td><td className="px-3 py-2 text-right font-semibold">Rs {fmt(p.amount)}</td><td className="px-3 py-2 text-right text-muted-foreground">{p.count}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <button onClick={() => setShowDetails(!showDetails)} className="text-sm text-primary font-medium cursor-pointer hover:underline">{showDetails ? "Hide" : "Show"} expense details ({data.expenseDetails.length} items)</button>
+        {showDetails && (
+          <div className="mt-2 bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b border-border"><tr><th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th><th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th><th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th><th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {data.expenseDetails.map((e, i) => (
+                  <tr key={i} className="hover:bg-muted/20">
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</td>
+                    <td className="px-3 py-2">{e.description || "—"}</td>
+                    <td className="px-3 py-2">{e.category}</td>
+                    <td className="px-3 py-2">{e.account}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-red-600">Rs {fmt(e.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AnnualPayrollData {
+  year: number; totalGross: number; totalDeductions: number; totalNet: number; totalAdvancesTaken: number;
+  employees: Array<{ employeeId: number; name: string; designation: string; totalGross: number; totalAdvanceDeducted: number; totalNet: number; totalAdvancesTaken: number; monthsPaid: number; months: Array<{ month: number; gross: number; deductions: number; net: number; paid: boolean }> }>;
+}
+
+function AnnualPayrollReport({ data, onExport }: { data: AnnualPayrollData; onExport: (rows: unknown[][], file: string) => void }) {
+  const [expandedEmp, setExpandedEmp] = React.useState<number | null>(null);
+  const csvRows = [
+    ["Employee", "Designation", "Gross Salary", "Advance Deducted", "Net Salary", "Advances Taken", "Months Paid"],
+    ...data.employees.map(e => [e.name, e.designation || "", e.totalGross, e.totalAdvanceDeducted, e.totalNet, e.totalAdvancesTaken, e.monthsPaid]),
+    ["TOTAL", "", data.totalGross, data.totalDeductions, data.totalNet, data.totalAdvancesTaken, ""],
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          <StatBox label={`${data.year} Gross`} value={`Rs ${fmt(data.totalGross)}`} color="text-foreground" />
+          <StatBox label="Deductions" value={`Rs ${fmt(data.totalDeductions)}`} color="text-amber-600" />
+          <StatBox label="Net Paid" value={`Rs ${fmt(data.totalNet)}`} color="text-red-600" />
+          <StatBox label="Advances Taken" value={`Rs ${fmt(data.totalAdvancesTaken)}`} color="text-orange-600" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, `payroll-${data.year}.csv`)} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="bg-background rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 border-b border-border"><tr>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Gross</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deductions</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net Salary</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Advances</th>
+            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Months</th>
+          </tr></thead>
+          <tbody className="divide-y divide-border">
+            {data.employees.map(emp => (
+              <React.Fragment key={emp.employeeId}>
+                <tr className="hover:bg-muted/30 cursor-pointer" onClick={() => setExpandedEmp(expandedEmp === emp.employeeId ? null : emp.employeeId)}>
+                  <td className="px-4 py-2.5"><p className="font-medium">{emp.name}</p>{emp.designation && <p className="text-xs text-muted-foreground">{emp.designation}</p>}</td>
+                  <td className="px-4 py-2.5 text-right">Rs {fmt(emp.totalGross)}</td>
+                  <td className="px-4 py-2.5 text-right text-amber-600">Rs {fmt(emp.totalAdvanceDeducted)}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-red-600">Rs {fmt(emp.totalNet)}</td>
+                  <td className="px-4 py-2.5 text-right text-orange-600">Rs {fmt(emp.totalAdvancesTaken)}</td>
+                  <td className="px-4 py-2.5 text-right">{emp.monthsPaid}/12</td>
+                </tr>
+                {expandedEmp === emp.employeeId && emp.months.length > 0 && (
+                  <tr><td colSpan={6} className="bg-muted/10 px-4 py-3">
+                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+                      {emp.months.map(m => (
+                        <div key={m.month} className={`text-center p-1 rounded text-xs ${m.paid ? "bg-emerald-100 text-emerald-700" : "bg-red-50 text-red-500"}`}>
+                          <p className="font-medium">{months[m.month - 1]}</p>
+                          <p>Rs {fmt(m.net)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+          <tfoot className="border-t-2 border-border bg-muted/20">
+            <tr>
+              <td className="px-4 py-3 font-bold">Total</td>
+              <td className="px-4 py-3 text-right font-bold">Rs {fmt(data.totalGross)}</td>
+              <td className="px-4 py-3 text-right font-bold text-amber-600">Rs {fmt(data.totalDeductions)}</td>
+              <td className="px-4 py-3 text-right font-bold text-red-600">Rs {fmt(data.totalNet)}</td>
+              <td className="px-4 py-3 text-right font-bold text-orange-600">Rs {fmt(data.totalAdvancesTaken)}</td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

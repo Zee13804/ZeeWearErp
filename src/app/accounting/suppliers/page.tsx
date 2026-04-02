@@ -443,8 +443,8 @@ export default function SuppliersPage() {
                     <tr key={i} className="hover:bg-muted/20">
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{new Date(row.date).toLocaleDateString()}</td>
                       <td className="px-3 py-2">{row.description}</td>
-                      <td className="px-3 py-2 text-right text-red-600">{row.type === "purchase" ? `Rs ${fmt(row.amount)}` : "—"}</td>
-                      <td className="px-3 py-2 text-right text-emerald-600">{row.type === "payment" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{row.type === "debit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                      <td className="px-3 py-2 text-right text-emerald-600">{row.type === "credit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
                       <td className={`px-3 py-2 text-right font-semibold ${row.runningBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(row.runningBalance)}</td>
                     </tr>
                   ))}
