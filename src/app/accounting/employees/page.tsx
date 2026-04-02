@@ -52,7 +52,11 @@ export default function EmployeesPage() {
   const [labourForm, setLabourForm] = useState({ workerName: "", description: "", amount: "", weekStart: "", weekEnd: "", paymentDate: "", accountId: "" });
 
   const accountOptions = [
-    { label: "No account (just record)", value: "" },
+    { label: "Select account *", value: "" },
+    ...accounts.map(a => ({ label: `${accountTypeIcon[a.type] || "🪙"} ${a.name} (Rs ${fmt(a.balance)})`, value: String(a.id) })),
+  ];
+  const accountOptionsOptional = [
+    { label: "Select account", value: "" },
     ...accounts.map(a => ({ label: `${accountTypeIcon[a.type] || "🪙"} ${a.name} (Rs ${fmt(a.balance)})`, value: String(a.id) })),
   ];
 
@@ -94,6 +98,7 @@ export default function EmployeesPage() {
   const handleAdvanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!advanceForm.employeeId || !advanceForm.amount) { showToast("Employee and amount required", "error"); return; }
+    if (!advanceForm.accountId) { showToast("Account is required for every advance", "error"); return; }
     setSaving(true);
     try {
       await apiPost("/accounting/employees/advances", advanceForm);
@@ -108,6 +113,7 @@ export default function EmployeesPage() {
   const handleSalarySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!salaryForm.employeeId || !salaryForm.baseSalary) { showToast("Employee and salary required", "error"); return; }
+    if (!salaryForm.accountId) { showToast("Account is required for every salary record", "error"); return; }
     setSaving(true);
     try {
       await apiPost("/accounting/employees/salaries", {
@@ -125,6 +131,7 @@ export default function EmployeesPage() {
   const handleLabourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!labourForm.workerName || !labourForm.amount) { showToast("Worker name and amount required", "error"); return; }
+    if (!labourForm.accountId) { showToast("Account is required for every labour payment", "error"); return; }
     setSaving(true);
     try {
       await apiPost("/accounting/employees/labour", labourForm);
@@ -417,7 +424,7 @@ export default function EmployeesPage() {
             <Select value={advanceForm.employeeId} onChange={val => setAdvanceForm({ ...advanceForm, employeeId: val })} options={[{ label: "Select employee", value: "" }, ...employees.map(e => ({ label: e.name, value: String(e.id) }))]} />
           </FormField>
           <FormField label="Amount (Rs)" required><Input type="number" value={advanceForm.amount} onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
-          <FormField label="Debit from Account">
+          <FormField label="Debit from Account" required>
             <Select value={advanceForm.accountId} onChange={val => setAdvanceForm({ ...advanceForm, accountId: val })} options={accountOptions} />
           </FormField>
           <FormField label="Reason"><Input value={advanceForm.reason} onChange={e => setAdvanceForm({ ...advanceForm, reason: e.target.value })} placeholder="Optional reason" /></FormField>
@@ -453,7 +460,7 @@ export default function EmployeesPage() {
               Net Salary: <span className="font-bold text-foreground">Rs {fmt((parseFloat(salaryForm.baseSalary) || 0) - (parseFloat(salaryForm.advanceDeducted) || 0))}</span>
             </div>
           )}
-          <FormField label="Pay From Account (optional)">
+          <FormField label="Pay From Account" required>
             <Select value={salaryForm.accountId} onChange={val => setSalaryForm({ ...salaryForm, accountId: val })} options={accountOptions} />
           </FormField>
           <FormField label="Note"><Input value={salaryForm.note} onChange={e => setSalaryForm({ ...salaryForm, note: e.target.value })} placeholder="Optional note" /></FormField>
@@ -474,7 +481,7 @@ export default function EmployeesPage() {
           <FormField label="Worker Name" required><Input value={labourForm.workerName} onChange={e => setLabourForm({ ...labourForm, workerName: e.target.value })} placeholder="Worker's name" /></FormField>
           <FormField label="Description"><Input value={labourForm.description} onChange={e => setLabourForm({ ...labourForm, description: e.target.value })} placeholder="Type of work done" /></FormField>
           <FormField label="Amount (Rs)" required><Input type="number" value={labourForm.amount} onChange={e => setLabourForm({ ...labourForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
-          <FormField label="Pay From Account (optional)">
+          <FormField label="Pay From Account" required>
             <Select value={labourForm.accountId} onChange={val => setLabourForm({ ...labourForm, accountId: val })} options={accountOptions} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
@@ -498,12 +505,12 @@ export default function EmployeesPage() {
               Net Amount: <span className="font-bold">Rs {fmt(markPaidTarget.netSalary)}</span>
             </div>
           )}
-          <FormField label="Debit from Account (optional)">
+          <FormField label="Debit from Account" required>
             <Select value={markPaidAccountId} onChange={val => setMarkPaidAccountId(val)} options={accountOptions} />
           </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setMarkPaidTarget(null)} className="cursor-pointer">Cancel</Button>
-            <Button onClick={handleMarkPaid} disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Mark as Paid"}</Button>
+            <Button onClick={handleMarkPaid} disabled={saving || !markPaidAccountId} className="cursor-pointer">{saving ? "Saving..." : "Mark as Paid"}</Button>
           </div>
         </div>
       </Dialog>

@@ -328,8 +328,8 @@ model Advance {
   id          Int      @id @default(autoincrement())
   employee    Employee @relation(fields: [employeeId], references: [id])
   employeeId  Int
-  account     Account? @relation(fields: [accountId], references: [id])
-  accountId   Int?
+  account     Account  @relation(fields: [accountId], references: [id])
+  accountId   Int
   amount      Float
   reason      String?
   repaid      Float    @default(0)
@@ -341,8 +341,8 @@ model SalaryRecord {
   id              Int      @id @default(autoincrement())
   employee        Employee @relation(fields: [employeeId], references: [id])
   employeeId      Int
-  account         Account? @relation(fields: [accountId], references: [id])
-  accountId       Int?
+  account         Account  @relation(fields: [accountId], references: [id])
+  accountId       Int
   month           Int
   year            Int
   baseSalary      Float
@@ -358,10 +358,11 @@ model SalaryRecord {
 
 model LabourPayment {
   id          Int      @id @default(autoincrement())
-  account     Account? @relation(fields: [accountId], references: [id])
-  accountId   Int?
+  account     Account  @relation(fields: [accountId], references: [id])
+  accountId   Int
   workerName  String
   description String?
+  note        String?
   amount      Float
   weekStart   DateTime?
   weekEnd     DateTime?

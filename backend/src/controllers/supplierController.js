@@ -266,7 +266,7 @@ const getSupplierLedger = async (req, res) => {
 
     const entries = [];
     for (const p of purchases) {
-      entries.push({ date: p.purchaseDate, type: 'debit', description: `Purchase${p.invoiceNo ? ` – ${p.invoiceNo}` : ''}`, amount: p.totalAmount, note: p.note });
+      entries.push({ date: p.purchaseDate, type: 'debit', description: `Purchase${p.invoiceNo ? ` – ${p.invoiceNo}` : ''}`, amount: p.totalAmount, note: p.description || '' });
     }
     for (const p of payments) {
       entries.push({ date: p.paymentDate, type: 'credit', description: `Payment${p.account ? ` via ${p.account.name}` : ''}`, amount: p.amount, note: p.note });

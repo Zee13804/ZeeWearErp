@@ -112,6 +112,7 @@ const createAdvance = async (req, res) => {
   try {
     const { employeeId, amount, reason, advanceDate, accountId } = req.body;
     if (!employeeId || !amount) return res.status(400).json({ error: 'employeeId and amount are required' });
+    if (!accountId) return res.status(400).json({ error: 'accountId is required — every advance must be linked to an account' });
 
     const advance = await prisma.advance.create({
       data: {
@@ -119,7 +120,7 @@ const createAdvance = async (req, res) => {
         amount: parseFloat(amount),
         reason: reason || null,
         advanceDate: advanceDate ? new Date(advanceDate) : new Date(),
-        ...(accountId && { accountId: parseInt(accountId) }),
+        accountId: parseInt(accountId),
       },
       include: { employee: { select: { id: true, name: true } } },
     });
@@ -181,6 +182,7 @@ const createSalary = async (req, res) => {
     const { employeeId, month, year, baseSalary, advanceDeducted, note, accountId, markPaid } = req.body;
     if (!employeeId || !month || !year || !baseSalary)
       return res.status(400).json({ error: 'employeeId, month, year and baseSalary are required' });
+    if (!accountId) return res.status(400).json({ error: 'accountId is required — every salary record must be linked to an account' });
 
     const eid = parseInt(employeeId);
     const base = parseFloat(baseSalary);
@@ -200,7 +202,7 @@ const createSalary = async (req, res) => {
           note: note || null,
           isPaid: paid,
           paidAt: paid ? new Date() : null,
-          ...(accountId && { accountId: parseInt(accountId) }),
+          accountId: parseInt(accountId),
         },
         include: { employee: { select: { id: true, name: true } } },
       });
@@ -238,12 +240,13 @@ const markSalaryPaid = async (req, res) => {
   try {
     const { id } = req.params;
     const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId is required when marking salary as paid' });
     const salary = await prisma.salaryRecord.update({
       where: { id: parseInt(id) },
       data: {
         isPaid: true,
         paidAt: new Date(),
-        ...(accountId && { accountId: parseInt(accountId) }),
+        accountId: parseInt(accountId),
       },
     });
     return res.json({ message: 'Salary marked as paid', salary });
@@ -287,18 +290,20 @@ const getLabourPayments = async (req, res) => {
 
 const createLabourPayment = async (req, res) => {
   try {
-    const { workerName, description, amount, weekStart, weekEnd, paymentDate, accountId } = req.body;
+    const { workerName, description, note, amount, weekStart, weekEnd, paymentDate, accountId } = req.body;
     if (!workerName || !amount) return res.status(400).json({ error: 'workerName and amount are required' });
+    if (!accountId) return res.status(400).json({ error: 'accountId is required — every labour payment must be linked to an account' });
 
     const payment = await prisma.labourPayment.create({
       data: {
         workerName,
         description: description || null,
+        note: note || null,
         amount: parseFloat(amount),
         weekStart: weekStart ? new Date(weekStart) : null,
         weekEnd: weekEnd ? new Date(weekEnd) : null,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-        ...(accountId && { accountId: parseInt(accountId) }),
+        accountId: parseInt(accountId),
       },
     });
     return res.status(201).json({ message: 'Labour payment recorded', payment });
