@@ -437,7 +437,7 @@ const getCollectionReport = async (req, res) => {
           amount: p.amount,
           invoiceNo: p.invoice.invoiceNo,
           customer: p.invoice.customer.name,
-          method: p.method,
+          method: acc.name,
         })),
       };
     }));
@@ -560,7 +560,7 @@ const getSalesReport = async (req, res) => {
       where,
       include: {
         customer: { select: { name: true, phone: true } },
-        payments: { select: { amount: true, paymentDate: true, method: true } },
+        payments: { select: { amount: true, paymentDate: true, account: { select: { name: true } } } },
       },
       orderBy: { invoiceDate: 'desc' },
     });
@@ -702,12 +702,12 @@ const getAnnualPayroll = async (req, res) => {
         employeeId: emp.id,
         name: emp.name,
         designation: emp.designation,
-        totalGross: empSalaries.reduce((s, r) => s + r.basicSalary, 0),
+        totalGross: empSalaries.reduce((s, r) => s + r.baseSalary, 0),
         totalAdvanceDeducted: empSalaries.reduce((s, r) => s + r.advanceDeducted, 0),
         totalNet: empSalaries.reduce((s, r) => s + r.netSalary, 0),
         totalAdvancesTaken: empAdvances.reduce((s, a) => s + a.amount, 0),
         monthsPaid: empSalaries.filter(r => r.isPaid).length,
-        months: empSalaries.map(r => ({ month: r.month, gross: r.basicSalary, deductions: r.advanceDeducted, net: r.netSalary, paid: r.isPaid })),
+        months: empSalaries.map(r => ({ month: r.month, gross: r.baseSalary, deductions: r.advanceDeducted, net: r.netSalary, paid: r.isPaid })),
       };
     });
 
@@ -811,7 +811,7 @@ const exportCsv = async (req, res) => {
       rows = [['Employee', 'Designation', 'Month', 'Year', 'Gross', 'Advance Deducted', 'Net', 'Paid']];
       const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       for (const s of salaries) {
-        rows.push([s.employee.name, s.employee.designation || '', monthNames[s.month - 1], s.year, s.basicSalary, s.advanceDeducted, s.netSalary, s.isPaid ? 'Yes' : 'No']);
+        rows.push([s.employee.name, s.employee.designation || '', monthNames[s.month - 1], s.year, s.baseSalary, s.advanceDeducted, s.netSalary, s.isPaid ? 'Yes' : 'No']);
       }
       filename = `payroll-${y}.csv`;
     } else {
