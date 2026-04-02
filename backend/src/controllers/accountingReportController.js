@@ -308,6 +308,151 @@ const getPayrollReport = async (req, res) => {
   }
 };
 
+// ── Monthly Breakdown (12-month revenue / cost trend) ──────
+
+const getMonthlyBreakdown = async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const months = [];
+    for (let m = 1; m <= 12; m++) {
+      const from = new Date(year, m - 1, 1);
+      const to = new Date(year, m, 0, 23, 59, 59, 999);
+
+      const [rev, exp, purch, lab, sal, adv] = await Promise.all([
+        prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
+        prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
+        prisma.advance.aggregate({ where: { advanceDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      ]);
+
+      const revenue = rev._sum.amount || 0;
+      const totalCosts = (exp._sum.amount || 0) + (purch._sum.totalAmount || 0) + (lab._sum.amount || 0) + (sal._sum.netSalary || 0) + (adv._sum.amount || 0);
+      months.push({
+        month: m,
+        year,
+        revenue,
+        expenses: exp._sum.amount || 0,
+        purchases: purch._sum.totalAmount || 0,
+        labour: lab._sum.amount || 0,
+        salaries: sal._sum.netSalary || 0,
+        advances: adv._sum.amount || 0,
+        totalCosts,
+        netProfit: revenue - totalCosts,
+      });
+    }
+    return res.json({ year, months });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch monthly breakdown', details: err.message });
+  }
+};
+
+// ── Expense Summary by Category & Account ─────────────────
+
+const getExpenseSummary = async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    const [byCategory, byAccount] = await Promise.all([
+      prisma.expense.groupBy({
+        by: ['categoryId'],
+        where: { expenseDate: { gte: from, lte: to } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.expense.groupBy({
+        by: ['accountId'],
+        where: { expenseDate: { gte: from, lte: to } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
+
+    const [cats, accs] = await Promise.all([
+      prisma.expenseCategory.findMany(),
+      prisma.account.findMany({ select: { id: true, name: true } }),
+    ]);
+    const catMap = Object.fromEntries(cats.map(c => [c.id, c.name]));
+    const accMap = Object.fromEntries(accs.map(a => [a.id, a.name]));
+
+    const total = byCategory.reduce((s, e) => s + (e._sum.amount || 0), 0);
+
+    return res.json({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      total,
+      byCategory: byCategory.map(e => ({
+        category: catMap[e.categoryId] || 'Uncategorized',
+        amount: e._sum.amount || 0,
+        count: e._count,
+        pct: total > 0 ? Math.round((e._sum.amount || 0) / total * 1000) / 10 : 0,
+      })).sort((a, b) => b.amount - a.amount),
+      byAccount: byAccount.map(e => ({
+        account: e.accountId ? (accMap[e.accountId] || 'Unknown') : 'No Account',
+        amount: e._sum.amount || 0,
+        count: e._count,
+      })).sort((a, b) => b.amount - a.amount),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch expense summary', details: err.message });
+  }
+};
+
+// ── Collection Report (payments received per account) ──────
+
+const getCollectionReport = async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
+
+    const accounts = await prisma.account.findMany({ where: { isActive: true } });
+    const report = await Promise.all(accounts.map(async (acc) => {
+      const [payments, transfers] = await Promise.all([
+        prisma.invoicePayment.findMany({
+          where: { accountId: acc.id, paymentDate: { gte: from, lte: to } },
+          include: { invoice: { select: { invoiceNo: true, customer: { select: { name: true } } } } },
+          orderBy: { paymentDate: 'desc' },
+        }),
+        prisma.accountTransfer.findMany({
+          where: { toAccountId: acc.id, date: { gte: from, lte: to } },
+          include: { fromAccount: { select: { name: true } } },
+          orderBy: { date: 'desc' },
+        }),
+      ]);
+      const totalReceived = payments.reduce((s, p) => s + p.amount, 0);
+      const totalTransfersIn = transfers.reduce((s, t) => s + t.amount, 0);
+      return {
+        accountId: acc.id,
+        accountName: acc.name,
+        accountType: acc.type,
+        totalReceived,
+        totalTransfersIn,
+        paymentCount: payments.length,
+        payments: payments.map(p => ({
+          date: p.paymentDate,
+          amount: p.amount,
+          invoiceNo: p.invoice.invoiceNo,
+          customer: p.invoice.customer.name,
+          method: p.method,
+        })),
+      };
+    }));
+
+    return res.json({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      accounts: report,
+      grandTotal: report.reduce((s, a) => s + a.totalReceived, 0),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch collection report', details: err.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getLedger,
@@ -315,4 +460,7 @@ module.exports = {
   getSupplierReport,
   getReceivableReport,
   getPayrollReport,
+  getMonthlyBreakdown,
+  getExpenseSummary,
+  getCollectionReport,
 };

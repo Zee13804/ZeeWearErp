@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/authMiddleware');
+const { authenticate, authorize } = require('../middleware/authMiddleware');
 const {
   getDashboard,
   getLedger,
@@ -8,13 +8,21 @@ const {
   getSupplierReport,
   getReceivableReport,
   getPayrollReport,
+  getMonthlyBreakdown,
+  getExpenseSummary,
+  getCollectionReport,
 } = require('../controllers/accountingReportController');
 
-router.get('/dashboard', authenticate, getDashboard);
-router.get('/ledger', authenticate, getLedger);
-router.get('/profit-loss', authenticate, getProfitLoss);
-router.get('/suppliers', authenticate, getSupplierReport);
-router.get('/receivables', authenticate, getReceivableReport);
-router.get('/payroll', authenticate, getPayrollReport);
+const adminAuth = [authenticate, authorize('admin')];
+
+router.get('/dashboard', ...adminAuth, getDashboard);
+router.get('/ledger', ...adminAuth, getLedger);
+router.get('/profit-loss', ...adminAuth, getProfitLoss);
+router.get('/suppliers', ...adminAuth, getSupplierReport);
+router.get('/receivables', ...adminAuth, getReceivableReport);
+router.get('/payroll', ...adminAuth, getPayrollReport);
+router.get('/monthly-breakdown', ...adminAuth, getMonthlyBreakdown);
+router.get('/expense-summary', ...adminAuth, getExpenseSummary);
+router.get('/collection', ...adminAuth, getCollectionReport);
 
 module.exports = router;

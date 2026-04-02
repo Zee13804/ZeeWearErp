@@ -9,13 +9,13 @@ const {
 
 const adminAuth = [authenticate, authorize('admin')];
 
-router.get('/', authenticate, getAccounts);
+router.get('/', ...adminAuth, getAccounts);
 router.post('/', ...adminAuth, createAccount);
-router.get('/:id/ledger', authenticate, getAccountLedger);
+router.get('/:id/ledger', ...adminAuth, getAccountLedger);
 router.put('/:id', ...adminAuth, updateAccount);
 router.delete('/:id', ...adminAuth, deleteAccount);
 
-router.get('/transfers', authenticate, getTransfers);
+router.get('/transfers', ...adminAuth, getTransfers);
 router.post('/transfers', ...adminAuth, createTransfer);
 router.delete('/transfers/:id', ...adminAuth, deleteTransfer);
 

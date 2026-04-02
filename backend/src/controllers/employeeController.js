@@ -182,26 +182,51 @@ const createSalary = async (req, res) => {
     if (!employeeId || !month || !year || !baseSalary)
       return res.status(400).json({ error: 'employeeId, month, year and baseSalary are required' });
 
+    const eid = parseInt(employeeId);
     const base = parseFloat(baseSalary);
     const deducted = advanceDeducted ? parseFloat(advanceDeducted) : 0;
     const net = base - deducted;
     const paid = markPaid === true || markPaid === 'true';
 
-    const salary = await prisma.salaryRecord.create({
-      data: {
-        employeeId: parseInt(employeeId),
-        month: parseInt(month),
-        year: parseInt(year),
-        baseSalary: base,
-        advanceDeducted: deducted,
-        netSalary: net,
-        note: note || null,
-        isPaid: paid,
-        paidAt: paid ? new Date() : null,
-        ...(accountId && { accountId: parseInt(accountId) }),
-      },
-      include: { employee: { select: { id: true, name: true } } },
+    const salary = await prisma.$transaction(async (tx) => {
+      const rec = await tx.salaryRecord.create({
+        data: {
+          employeeId: eid,
+          month: parseInt(month),
+          year: parseInt(year),
+          baseSalary: base,
+          advanceDeducted: deducted,
+          netSalary: net,
+          note: note || null,
+          isPaid: paid,
+          paidAt: paid ? new Date() : null,
+          ...(accountId && { accountId: parseInt(accountId) }),
+        },
+        include: { employee: { select: { id: true, name: true } } },
+      });
+
+      if (deducted > 0) {
+        const allAdvances = await tx.advance.findMany({
+          where: { employeeId: eid },
+          orderBy: { advanceDate: 'asc' },
+        });
+        const outstanding = allAdvances.filter(a => a.repaid < a.amount);
+        let remaining = deducted;
+        for (const adv of outstanding) {
+          if (remaining <= 0) break;
+          const unpaid = adv.amount - adv.repaid;
+          const toRepay = Math.min(unpaid, remaining);
+          await tx.advance.update({
+            where: { id: adv.id },
+            data: { repaid: { increment: toRepay } },
+          });
+          remaining -= toRepay;
+        }
+      }
+
+      return rec;
     });
+
     return res.status(201).json({ message: 'Salary record created', salary });
   } catch (err) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Salary record for this month already exists' });

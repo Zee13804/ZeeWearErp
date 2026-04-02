@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { apiGet } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, Printer } from "lucide-react";
 
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -25,6 +25,9 @@ export default function AccountingReportsPage() {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [ledgerFilter, setLedgerFilter] = useState({ accountId: "", dateFrom: "", dateTo: "" });
   const [payrollFilter, setPayrollFilter] = useState({ month: "", year: String(new Date().getFullYear()) });
+  const [monthlyYear, setMonthlyYear] = useState(String(new Date().getFullYear()));
+  const [expenseRange, setExpenseRange] = useState({ from: "", to: "" });
+  const [collectionRange, setCollectionRange] = useState({ from: "", to: "" });
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
@@ -55,6 +58,18 @@ export default function AccountingReportsPage() {
         if (payrollFilter.month) params.set("month", payrollFilter.month);
         if (payrollFilter.year) params.set("year", payrollFilter.year);
         res = await apiGet(`/accounting/reports/payroll?${params}`);
+      } else if (tab === "monthly") {
+        res = await apiGet(`/accounting/reports/monthly-breakdown?year=${monthlyYear}`);
+      } else if (tab === "expenses") {
+        const params = new URLSearchParams();
+        if (expenseRange.from) params.set("dateFrom", expenseRange.from);
+        if (expenseRange.to) params.set("dateTo", expenseRange.to);
+        res = await apiGet(`/accounting/reports/expense-summary?${params}`);
+      } else if (tab === "collection") {
+        const params = new URLSearchParams();
+        if (collectionRange.from) params.set("dateFrom", collectionRange.from);
+        if (collectionRange.to) params.set("dateTo", collectionRange.to);
+        res = await apiGet(`/accounting/reports/collection?${params}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -75,10 +90,15 @@ export default function AccountingReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const printReport = () => window.print();
+
   const tabs: { key: ReportTab; label: string }[] = [
     { key: "pl", label: "Profit & Loss" },
-    { key: "ledger", label: "Cash Ledger" },
-    { key: "suppliers", label: "Supplier Balances" },
+    { key: "monthly", label: "Monthly Trend" },
+    { key: "ledger", label: "General Ledger" },
+    { key: "expenses", label: "Expense Summary" },
+    { key: "collection", label: "Collection" },
+    { key: "suppliers", label: "Suppliers" },
     { key: "receivables", label: "Receivables" },
     { key: "payroll", label: "Payroll" },
   ];
@@ -91,54 +111,47 @@ export default function AccountingReportsPage() {
           <p className="text-sm text-muted-foreground">Comprehensive accounting reports</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors cursor-pointer ${tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+          <div className="flex flex-wrap gap-1.5">
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors cursor-pointer ${tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={printReport} className="gap-2 cursor-pointer print:hidden">
+            <Printer className="w-4 h-4" /> Print
+          </Button>
         </div>
 
-        {(tab === "pl" || tab === "ledger" || tab === "payroll") && (
-          <div className="flex flex-wrap items-end gap-3 bg-background rounded-xl border border-border p-3">
+        {(tab === "pl" || tab === "ledger" || tab === "payroll" || tab === "monthly" || tab === "expenses" || tab === "collection") && (
+          <div className="flex flex-wrap items-end gap-3 bg-background rounded-xl border border-border p-3 print:hidden">
             {tab === "pl" && (
               <>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">From</p>
-                  <Input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })} className="w-[150px]" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">To</p>
-                  <Input type="date" value={dateRange.to} onChange={e => setDateRange({ ...dateRange, to: e.target.value })} className="w-[150px]" />
-                </div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={dateRange.to} onChange={e => setDateRange({ ...dateRange, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
             {tab === "ledger" && (
               <>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Account</p>
-                  <Select value={ledgerFilter.accountId} onChange={val => setLedgerFilter({ ...ledgerFilter, accountId: val})} options={[{ label: "All Accounts", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} className="w-[160px]" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">From</p>
-                  <Input type="date" value={ledgerFilter.dateFrom} onChange={e => setLedgerFilter({ ...ledgerFilter, dateFrom: e.target.value })} className="w-[150px]" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">To</p>
-                  <Input type="date" value={ledgerFilter.dateTo} onChange={e => setLedgerFilter({ ...ledgerFilter, dateTo: e.target.value })} className="w-[150px]" />
-                </div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Account</p><Select value={ledgerFilter.accountId} onChange={val => setLedgerFilter({ ...ledgerFilter, accountId: val})} options={[{ label: "All Accounts", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} className="w-[160px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={ledgerFilter.dateFrom} onChange={e => setLedgerFilter({ ...ledgerFilter, dateFrom: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={ledgerFilter.dateTo} onChange={e => setLedgerFilter({ ...ledgerFilter, dateTo: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
             {tab === "payroll" && (
               <>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Month</p>
-                  <Select value={payrollFilter.month} onChange={val => setPayrollFilter({ ...payrollFilter, month: val})} options={[{ label: "All", value: "" }, ...months.map((m, i) => ({ label: m, value: String(i + 1) }))]} className="w-[120px]" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Year</p>
-                  <Input type="number" value={payrollFilter.year} onChange={e => setPayrollFilter({ ...payrollFilter, year: e.target.value })} min="2020" max="2030" className="w-[100px]" />
-                </div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Month</p><Select value={payrollFilter.month} onChange={val => setPayrollFilter({ ...payrollFilter, month: val})} options={[{ label: "All", value: "" }, ...months.map((m, i) => ({ label: m, value: String(i + 1) }))]} className="w-[120px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={payrollFilter.year} onChange={e => setPayrollFilter({ ...payrollFilter, year: e.target.value })} min="2020" max="2030" className="w-[100px]" /></div>
+              </>
+            )}
+            {tab === "monthly" && (
+              <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={monthlyYear} onChange={e => setMonthlyYear(e.target.value)} min="2020" max="2030" className="w-[100px]" /></div>
+            )}
+            {(tab === "expenses" || tab === "collection") && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={tab === "expenses" ? expenseRange.from : collectionRange.from} onChange={e => tab === "expenses" ? setExpenseRange({ ...expenseRange, from: e.target.value }) : setCollectionRange({ ...collectionRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={tab === "expenses" ? expenseRange.to : collectionRange.to} onChange={e => tab === "expenses" ? setExpenseRange({ ...expenseRange, to: e.target.value }) : setCollectionRange({ ...collectionRange, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
@@ -148,15 +161,21 @@ export default function AccountingReportsPage() {
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
         ) : !data ? null : tab === "pl" ? (
-          <PLReport data={data as PLData} onExport={exportCSV} />
+          <PLReport data={data as unknown as PLData} onExport={exportCSV} />
         ) : tab === "ledger" ? (
-          <LedgerReport data={data as LedgerData} onExport={exportCSV} />
+          <LedgerReport data={data as unknown as LedgerData} onExport={exportCSV} />
         ) : tab === "suppliers" ? (
-          <SupplierReport data={data as SupplierData} onExport={exportCSV} />
+          <SupplierReport data={data as unknown as SupplierData} onExport={exportCSV} />
         ) : tab === "receivables" ? (
-          <ReceivableReport data={data as ReceivableData} onExport={exportCSV} />
+          <ReceivableReport data={data as unknown as ReceivableData} onExport={exportCSV} />
         ) : tab === "payroll" ? (
-          <PayrollReport data={data as PayrollData} />
+          <PayrollReport data={data as unknown as PayrollData} />
+        ) : tab === "monthly" ? (
+          <MonthlyReport data={data as unknown as MonthlyData} onExport={exportCSV} />
+        ) : tab === "expenses" ? (
+          <ExpenseSummaryReport data={data as unknown as ExpenseSummaryData} onExport={exportCSV} />
+        ) : tab === "collection" ? (
+          <CollectionReport data={data as unknown as CollectionData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -419,6 +438,188 @@ function PayrollReport({ data }: { data: PayrollData }) {
             </table>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface MonthlyData {
+  year: number;
+  months: Array<{ month: number; year: number; revenue: number; expenses: number; purchases: number; labour: number; salaries: number; advances: number; totalCosts: number; netProfit: number }>;
+}
+
+function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Month", "Revenue", "Expenses", "Purchases", "Labour", "Salaries", "Advances", "Total Costs", "Net Profit"],
+    ...data.months.map(m => [months[m.month - 1], m.revenue, m.expenses, m.purchases, m.labour, m.salaries, m.advances, m.totalCosts, m.netProfit]),
+  ];
+  const totalRevenue = data.months.reduce((s, m) => s + m.revenue, 0);
+  const totalCosts = data.months.reduce((s, m) => s + m.totalCosts, 0);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-4">
+          <StatBox label={`${data.year} Total Revenue`} value={`Rs ${fmt(totalRevenue)}`} color="text-emerald-600" />
+          <StatBox label={`${data.year} Total Costs`} value={`Rs ${fmt(totalCosts)}`} color="text-red-600" />
+          <StatBox label="Net P&L" value={`Rs ${fmt(totalRevenue - totalCosts)}`} color={totalRevenue - totalCosts >= 0 ? "text-emerald-600" : "text-red-600"} />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, `monthly-${data.year}.csv`)} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="bg-background rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 border-b border-border">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Month</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Revenue</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Purchases</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Expenses</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Salaries</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Labour</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total Costs</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net P&L</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {data.months.map(m => (
+              <tr key={m.month} className={`hover:bg-muted/30 ${m.revenue === 0 && m.totalCosts === 0 ? "opacity-40" : ""}`}>
+                <td className="px-4 py-2.5 font-medium">{months[m.month - 1]} {m.year}</td>
+                <td className="px-4 py-2.5 text-right text-emerald-600">Rs {fmt(m.revenue)}</td>
+                <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.purchases)}</td>
+                <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.expenses)}</td>
+                <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.salaries)}</td>
+                <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.labour)}</td>
+                <td className="px-4 py-2.5 text-right text-red-600 font-semibold">Rs {fmt(m.totalCosts)}</td>
+                <td className={`px-4 py-2.5 text-right font-bold ${m.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(m.netProfit)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="border-t-2 border-border bg-muted/20">
+            <tr>
+              <td className="px-4 py-3 font-bold">Total</td>
+              <td className="px-4 py-3 text-right font-bold text-emerald-600">Rs {fmt(totalRevenue)}</td>
+              <td colSpan={4} />
+              <td className="px-4 py-3 text-right font-bold text-red-600">Rs {fmt(totalCosts)}</td>
+              <td className={`px-4 py-3 text-right font-bold ${totalRevenue - totalCosts >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(totalRevenue - totalCosts)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface ExpenseSummaryData {
+  from: string; to: string; total: number;
+  byCategory: Array<{ category: string; amount: number; count: number; pct: number }>;
+  byAccount: Array<{ account: string; amount: number; count: number }>;
+}
+
+function ExpenseSummaryReport({ data, onExport }: { data: ExpenseSummaryData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Category", "Amount", "Count", "%"],
+    ...data.byCategory.map(e => [e.category, e.amount, e.count, e.pct + "%"]),
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <StatBox label="Total Expenses" value={`Rs ${fmt(data.total)}`} color="text-red-600" />
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "expense-summary.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm font-semibold mb-2">By Category</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr><th className="text-left px-4 py-3 font-medium text-muted-foreground">Category</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">%</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.byCategory.map((e, i) => (
+                  <tr key={i} className="hover:bg-muted/30">
+                    <td className="px-4 py-2.5">{e.category}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold">Rs {fmt(e.amount)}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{e.pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-semibold mb-2">By Account</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr><th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th><th className="text-right px-4 py-3 font-medium text-muted-foreground">Txns</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.byAccount.map((e, i) => (
+                  <tr key={i} className="hover:bg-muted/30">
+                    <td className="px-4 py-2.5">{e.account}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold">Rs {fmt(e.amount)}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{e.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CollectionData {
+  from: string; to: string; grandTotal: number;
+  accounts: Array<{ accountId: number; accountName: string; accountType: string; totalReceived: number; totalTransfersIn: number; paymentCount: number; payments: Array<{ date: string; amount: number; invoiceNo: string; customer: string; method: string }> }>;
+}
+
+function CollectionReport({ data, onExport }: { data: CollectionData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Account", "Invoice", "Customer", "Date", "Amount", "Method"],
+    ...data.accounts.flatMap(a => a.payments.map(p => [a.accountName, p.invoiceNo, p.customer, new Date(p.date).toLocaleDateString(), p.amount, p.method || ""])),
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <StatBox label="Total Collected" value={`Rs ${fmt(data.grandTotal)}`} color="text-emerald-600" />
+          <StatBox label="Accounts" value={String(data.accounts.length)} color="text-blue-600" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "collection-report.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      {data.accounts.filter(a => a.totalReceived > 0 || a.paymentCount > 0).map(acc => (
+        <div key={acc.accountId} className="bg-background rounded-xl border border-border overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
+            <div><p className="font-semibold">{acc.accountName}</p><p className="text-xs text-muted-foreground capitalize">{acc.accountType}</p></div>
+            <p className="text-lg font-bold text-emerald-600">Rs {fmt(acc.totalReceived)}</p>
+          </div>
+          {acc.payments.length === 0 ? (
+            <p className="text-center py-4 text-muted-foreground text-sm">No payments received in this period</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 border-b border-border"><tr>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground">Invoice</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground">Customer</th>
+                <th className="text-right px-4 py-2 font-medium text-muted-foreground">Amount</th>
+              </tr></thead>
+              <tbody className="divide-y divide-border">
+                {acc.payments.map((p, i) => (
+                  <tr key={i} className="hover:bg-muted/20">
+                    <td className="px-4 py-2 text-muted-foreground">{new Date(p.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 font-medium">{p.invoiceNo}</td>
+                    <td className="px-4 py-2">{p.customer}</td>
+                    <td className="px-4 py-2 text-right font-semibold text-emerald-600">Rs {fmt(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ))}
+      {data.accounts.every(a => a.totalReceived === 0) && (
+        <div className="text-center py-12 text-muted-foreground">No payments collected in this period.</div>
       )}
     </div>
   );

@@ -10,22 +10,22 @@ const {
 
 const adminAuth = [authenticate, authorize('admin')];
 
-router.get('/', authenticate, getEmployees);
+router.get('/', ...adminAuth, getEmployees);
 router.post('/', ...adminAuth, createEmployee);
 router.put('/:id', ...adminAuth, updateEmployee);
 router.delete('/:id', ...adminAuth, deleteEmployee);
 
-router.get('/advances', authenticate, getAdvances);
+router.get('/advances', ...adminAuth, getAdvances);
 router.post('/advances', ...adminAuth, createAdvance);
 router.put('/advances/:id/repay', ...adminAuth, repayAdvance);
 router.delete('/advances/:id', ...adminAuth, deleteAdvance);
 
-router.get('/salaries', authenticate, getSalaries);
+router.get('/salaries', ...adminAuth, getSalaries);
 router.post('/salaries', ...adminAuth, createSalary);
 router.put('/salaries/:id/paid', ...adminAuth, markSalaryPaid);
 router.delete('/salaries/:id', ...adminAuth, deleteSalary);
 
-router.get('/labour', authenticate, getLabourPayments);
+router.get('/labour', ...adminAuth, getLabourPayments);
 router.post('/labour', ...adminAuth, createLabourPayment);
 router.delete('/labour/:id', ...adminAuth, deleteLabourPayment);
 

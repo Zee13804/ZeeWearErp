@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
-import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 
 interface Supplier {
   id: number;
@@ -67,6 +67,8 @@ export default function SuppliersPage() {
   const [uploadingBill, setUploadingBill] = useState<number | null>(null);
   const billInputRef = useRef<HTMLInputElement>(null);
   const [billTargetId, setBillTargetId] = useState<number | null>(null);
+  const [supplierLedger, setSupplierLedger] = useState<{ supplier: { id: number; name: string; phone?: string }; ledger: Array<{ date: string; type: string; description: string; amount: number; runningBalance: number }>; totalPurchased: number; totalPaid: number; balance: number } | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   const [supplierForm, setSupplierForm] = useState({ name: "", company: "", phone: "", email: "", address: "" });
   const [purchaseForm, setPurchaseForm] = useState({
@@ -185,6 +187,16 @@ export default function SuppliersPage() {
     finally { setUploadingBill(null); setBillTargetId(null); if (billInputRef.current) billInputRef.current.value = ""; }
   };
 
+  const viewLedger = async (supplierId: number) => {
+    setLedgerLoading(true);
+    setSupplierLedger(null);
+    try {
+      const data = await apiGet(`/accounting/suppliers/${supplierId}/ledger`);
+      setSupplierLedger(data);
+    } catch { showToast("Failed to load supplier ledger", "error"); }
+    finally { setLedgerLoading(false); }
+  };
+
   const totalDebt = suppliers.reduce((s, sup) => s + sup.balance, 0);
 
   return (
@@ -243,7 +255,10 @@ export default function SuppliersPage() {
                         <td className="px-4 py-3 text-right text-emerald-600">Rs {fmt(s.totalPaid)}</td>
                         <td className={`px-4 py-3 text-right font-semibold ${s.balance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(s.balance)}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => setDeleteTarget({ id: s.id, type: "supplier", name: s.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => viewLedger(s.id)} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer" title="View Ledger"><BookOpen className="w-3.5 h-3.5 text-blue-500" /></button>
+                            <button onClick={() => setDeleteTarget({ id: s.id, type: "supplier", name: s.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -401,6 +416,45 @@ export default function SuppliersPage() {
       </Dialog>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Confirm Delete" message={`Delete "${deleteTarget?.name}"?`} loading={saving} />
+
+      <Dialog open={!!supplierLedger || ledgerLoading} onClose={() => setSupplierLedger(null)} title={supplierLedger ? `Ledger — ${supplierLedger.supplier.name}` : "Loading Ledger..."} className="max-w-3xl">
+        {ledgerLoading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : supplierLedger ? (
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Purchased</p><p className="font-bold text-sm mt-1">Rs {fmt(supplierLedger.totalPurchased)}</p></div>
+              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Paid</p><p className="font-bold text-sm mt-1 text-emerald-600">Rs {fmt(supplierLedger.totalPaid)}</p></div>
+              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Balance Due</p><p className={`font-bold text-sm mt-1 ${supplierLedger.balance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(supplierLedger.balance)}</p></div>
+            </div>
+            <div className="bg-background rounded-xl border border-border overflow-hidden max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 border-b border-border sticky top-0">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Debit</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Credit</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {supplierLedger.ledger.map((row, i) => (
+                    <tr key={i} className="hover:bg-muted/20">
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{new Date(row.date).toLocaleDateString()}</td>
+                      <td className="px-3 py-2">{row.description}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{row.type === "purchase" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                      <td className="px-3 py-2 text-right text-emerald-600">{row.type === "payment" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                      <td className={`px-3 py-2 text-right font-semibold ${row.runningBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(row.runningBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {supplierLedger.ledger.length === 0 && <p className="text-center py-8 text-muted-foreground">No transactions found</p>}
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
     </DashboardLayout>
   );
 }

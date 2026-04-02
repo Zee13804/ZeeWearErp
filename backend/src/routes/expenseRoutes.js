@@ -10,11 +10,11 @@ const {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const adminAuth = [authenticate, authorize('admin')];
 
-router.get('/categories', authenticate, getCategories);
+router.get('/categories', ...adminAuth, getCategories);
 router.post('/categories', ...adminAuth, createCategory);
 router.delete('/categories/:id', ...adminAuth, deleteCategory);
 
-router.get('/', authenticate, getExpenses);
+router.get('/', ...adminAuth, getExpenses);
 router.post('/', ...adminAuth, createExpense);
 router.put('/:id', ...adminAuth, updateExpense);
 router.post('/:id/bill', ...adminAuth, upload.single('bill'), uploadExpenseBill);

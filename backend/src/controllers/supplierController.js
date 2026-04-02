@@ -241,8 +241,62 @@ const deleteSupplierPayment = async (req, res) => {
   }
 };
 
+const getSupplierLedger = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dateFrom, dateTo } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : undefined;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : undefined;
+    const range = (from || to) ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
+
+    const supplier = await prisma.supplier.findUnique({ where: { id: parseInt(id) } });
+    if (!supplier) return res.status(404).json({ error: 'Supplier not found' });
+
+    const [purchases, payments] = await Promise.all([
+      prisma.supplierPurchase.findMany({
+        where: { supplierId: parseInt(id), ...(range ? { purchaseDate: range } : {}) },
+        orderBy: { purchaseDate: 'asc' },
+      }),
+      prisma.supplierPayment.findMany({
+        where: { supplierId: parseInt(id), ...(range ? { paymentDate: range } : {}) },
+        include: { account: { select: { name: true } } },
+        orderBy: { paymentDate: 'asc' },
+      }),
+    ]);
+
+    const entries = [];
+    for (const p of purchases) {
+      entries.push({ date: p.purchaseDate, type: 'debit', description: `Purchase${p.invoiceNo ? ` – ${p.invoiceNo}` : ''}`, amount: p.totalAmount, note: p.notes });
+    }
+    for (const p of payments) {
+      entries.push({ date: p.paymentDate, type: 'credit', description: `Payment${p.account ? ` via ${p.account.name}` : ''}`, amount: p.amount, note: p.note });
+    }
+    entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let balance = 0;
+    for (const e of entries) {
+      balance = e.type === 'debit' ? balance + e.amount : balance - e.amount;
+      e.runningBalance = Math.round(balance * 100) / 100;
+    }
+
+    const totalPurchased = purchases.reduce((s, p) => s + p.totalAmount, 0);
+    const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+
+    return res.json({
+      supplier: { id: supplier.id, name: supplier.name, phone: supplier.phone },
+      ledger: entries,
+      totalPurchased,
+      totalPaid,
+      balance: totalPurchased - totalPaid,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch supplier ledger', details: err.message });
+  }
+};
+
 module.exports = {
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getPurchases, createPurchase, uploadPurchaseBill, deletePurchase,
   getSupplierPayments, createSupplierPayment, deleteSupplierPayment,
+  getSupplierLedger,
 };
