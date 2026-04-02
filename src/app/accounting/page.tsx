@@ -6,8 +6,16 @@ import { apiGet } from "@/lib/api";
 import Link from "next/link";
 import {
   Wallet, TrendingUp, TrendingDown, ShoppingCart, AlertCircle,
-  Users, FileText, Receipt, Briefcase, BarChart3, ArrowRight, Loader2
+  Users, FileText, Receipt, Briefcase, BarChart3, ArrowRight, Loader2, CreditCard
 } from "lucide-react";
+
+interface RecentTx {
+  date: string;
+  type: string;
+  description: string;
+  account: string;
+  amount: number;
+}
 
 interface DashboardData {
   totalCash: number;
@@ -18,7 +26,9 @@ interface DashboardData {
   monthlySalaries: number;
   pendingReceivable: number;
   supplierDebt: number;
+  advancesOutstanding: number;
   accounts: Array<{ id: number; name: string; type: string; balance: number }>;
+  recentTransactions: RecentTx[];
 }
 
 function fmt(n: number) {
@@ -82,6 +92,11 @@ export default function AccountingDashboard() {
               <StatCard icon={AlertCircle} label="Pending Receivable" value={fmt(data.pendingReceivable)} color="text-amber-600" sub="Unpaid invoices" />
               <StatCard icon={Briefcase} label="Supplier Debt" value={fmt(data.supplierDebt)} color="text-purple-600" sub="Amount owed to suppliers" />
             </div>
+            {data.advancesOutstanding > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <StatCard icon={CreditCard} label="Employee Advances Outstanding" value={fmt(data.advancesOutstanding)} color="text-rose-600" sub="Unrecovered employee advances" />
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-background rounded-xl border border-border p-4">
                 <p className="text-xs text-muted-foreground">Monthly Expenses</p>
@@ -119,6 +134,33 @@ export default function AccountingDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {data.recentTransactions && data.recentTransactions.length > 0 && (
+              <div className="bg-background rounded-xl border border-border p-5">
+                <h2 className="text-sm font-semibold text-foreground mb-4">Recent Transactions</h2>
+                <div className="divide-y divide-border">
+                  {data.recentTransactions.map((tx, i) => (
+                    <div key={i} className="flex items-center justify-between py-2.5 gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`p-1.5 rounded-md shrink-0 ${tx.type === 'receipt' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                          {tx.type === 'receipt' ? <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{tx.description}</p>
+                          <p className="text-xs text-muted-foreground">{tx.account} · {new Date(tx.date).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <span className={`text-sm font-semibold shrink-0 ${tx.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {tx.amount >= 0 ? '+' : ''}Rs {fmt(Math.abs(tx.amount))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/accounting/reports" className="flex items-center gap-1.5 text-xs text-primary mt-3 hover:underline">
+                  View full reports <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             )}
           </>

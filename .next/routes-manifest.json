@@ -62,6 +62,48 @@
       "namedRegex": "^/accessories(?:/)?$"
     },
     {
+      "page": "/accounting",
+      "regex": "^/accounting(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting(?:/)?$"
+    },
+    {
+      "page": "/accounting/accounts",
+      "regex": "^/accounting/accounts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/accounts(?:/)?$"
+    },
+    {
+      "page": "/accounting/employees",
+      "regex": "^/accounting/employees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/employees(?:/)?$"
+    },
+    {
+      "page": "/accounting/expenses",
+      "regex": "^/accounting/expenses(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/expenses(?:/)?$"
+    },
+    {
+      "page": "/accounting/invoices",
+      "regex": "^/accounting/invoices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/invoices(?:/)?$"
+    },
+    {
+      "page": "/accounting/reports",
+      "regex": "^/accounting/reports(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/reports(?:/)?$"
+    },
+    {
+      "page": "/accounting/suppliers",
+      "regex": "^/accounting/suppliers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/suppliers(?:/)?$"
+    },
+    {
       "page": "/articles",
       "regex": "^/articles(?:/)?$",
       "routeKeys": {},

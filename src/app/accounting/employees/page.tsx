@@ -36,6 +36,8 @@ export default function EmployeesPage() {
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [showSalaryForm, setShowSalaryForm] = useState(false);
   const [showLabourForm, setShowLabourForm] = useState(false);
+  const [repayTarget, setRepayTarget] = useState<Advance | null>(null);
+  const [repayAmount, setRepayAmount] = useState("");
   const [markPaidTarget, setMarkPaidTarget] = useState<Salary | null>(null);
   const [markPaidAccountId, setMarkPaidAccountId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; type: string; name: string } | null>(null);
@@ -129,6 +131,24 @@ export default function EmployeesPage() {
       showToast("Labour payment recorded", "success");
       setShowLabourForm(false);
       setLabourForm({ workerName: "", description: "", amount: "", weekStart: "", weekEnd: "", paymentDate: "", accountId: "" });
+      load();
+    } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
+    finally { setSaving(false); }
+  };
+
+  const handleRepay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repayTarget) return;
+    const amt = parseFloat(repayAmount);
+    if (!amt || amt <= 0) { showToast("Enter a valid repayment amount", "error"); return; }
+    const balance = repayTarget.amount - repayTarget.repaid;
+    if (amt > balance) { showToast(`Amount exceeds outstanding balance (Rs ${fmt(balance)})`, "error"); return; }
+    setSaving(true);
+    try {
+      await apiPut(`/accounting/employees/advances/${repayTarget.id}/repay`, { repaid: amt });
+      showToast("Repayment recorded", "success");
+      setRepayTarget(null);
+      setRepayAmount("");
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -255,7 +275,12 @@ export default function EmployeesPage() {
                             <td className="px-4 py-3 text-right text-emerald-600">Rs {fmt(a.repaid)}</td>
                             <td className={`px-4 py-3 text-right font-semibold ${a.amount - a.repaid > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(a.amount - a.repaid)}</td>
                             <td className="px-4 py-3 text-right">
-                              <button onClick={() => setDeleteTarget({ id: a.id, type: "advance", name: `Advance for ${a.employee.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              <div className="flex items-center justify-end gap-1">
+                                {a.amount - a.repaid > 0 && (
+                                  <button onClick={() => { setRepayTarget(a); setRepayAmount(""); }} className="px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-pointer">Repay</button>
+                                )}
+                                <button onClick={() => setDeleteTarget({ id: a.id, type: "advance", name: `Advance for ${a.employee.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -481,6 +506,22 @@ export default function EmployeesPage() {
             <Button onClick={handleMarkPaid} disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Mark as Paid"}</Button>
           </div>
         </div>
+      </Dialog>
+
+      {/* Repay Advance Dialog */}
+      <Dialog open={!!repayTarget} onClose={() => { setRepayTarget(null); setRepayAmount(""); }} title="Record Repayment"
+        description={repayTarget ? `Repay advance for ${repayTarget.employee.name} — Outstanding: Rs ${fmt(repayTarget.amount - repayTarget.repaid)}` : ""}>
+        {repayTarget && (
+          <form onSubmit={handleRepay} className="space-y-4">
+            <FormField label="Repayment Amount (Rs)">
+              <Input type="number" min="1" max={repayTarget.amount - repayTarget.repaid} step="0.01" value={repayAmount} onChange={e => setRepayAmount(e.target.value)} placeholder={`Max Rs ${fmt(repayTarget.amount - repayTarget.repaid)}`} required />
+            </FormField>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="ghost" onClick={() => { setRepayTarget(null); setRepayAmount(""); }}>Cancel</Button>
+              <Button type="submit" disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Record Repayment"}</Button>
+            </div>
+          </form>
+        )}
       </Dialog>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Confirm Delete" message={`Delete "${deleteTarget?.name}"?`} loading={saving} />

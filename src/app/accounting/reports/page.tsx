@@ -12,7 +12,7 @@ import { Loader2, Download, Printer } from "lucide-react";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -32,6 +32,10 @@ export default function AccountingReportsPage() {
   const [salesRange, setSalesRange] = useState({ from: "", to: "", status: "all" });
   const [costsRange, setCostsRange] = useState({ from: "", to: "" });
   const [annualPayrollYear, setAnnualPayrollYear] = useState(String(new Date().getFullYear()));
+  const [salarySheetFilter, setSalarySheetFilter] = useState({ month: "", year: String(new Date().getFullYear()) });
+  const [advanceReportFilter, setAdvanceReportFilter] = useState({ status: "all" });
+  const [labourRange, setLabourRange] = useState({ from: "", to: "" });
+  const [invoiceStatusRange, setInvoiceStatusRange] = useState({ from: "", to: "" });
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
@@ -94,6 +98,25 @@ export default function AccountingReportsPage() {
         res = await apiGet(`/accounting/reports/cost-analysis?${params}`);
       } else if (tab === "annual-payroll") {
         res = await apiGet(`/accounting/reports/annual-payroll?year=${annualPayrollYear}`);
+      } else if (tab === "salary-sheet") {
+        const params = new URLSearchParams();
+        if (salarySheetFilter.month) params.set("month", salarySheetFilter.month);
+        if (salarySheetFilter.year) params.set("year", salarySheetFilter.year);
+        res = await apiGet(`/accounting/reports/salary-sheet?${params}`);
+      } else if (tab === "advance-report") {
+        const params = new URLSearchParams();
+        if (advanceReportFilter.status !== "all") params.set("status", advanceReportFilter.status);
+        res = await apiGet(`/accounting/reports/advance-report?${params}`);
+      } else if (tab === "labour-report") {
+        const params = new URLSearchParams();
+        if (labourRange.from) params.set("dateFrom", labourRange.from);
+        if (labourRange.to) params.set("dateTo", labourRange.to);
+        res = await apiGet(`/accounting/reports/labour-report?${params}`);
+      } else if (tab === "invoice-status") {
+        const params = new URLSearchParams();
+        if (invoiceStatusRange.from) params.set("dateFrom", invoiceStatusRange.from);
+        if (invoiceStatusRange.to) params.set("dateTo", invoiceStatusRange.to);
+        res = await apiGet(`/accounting/reports/invoice-status?${params}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -130,6 +153,10 @@ export default function AccountingReportsPage() {
     { key: "receivables", label: "Receivables" },
     { key: "payroll", label: "Payroll" },
     { key: "annual-payroll", label: "Annual Payroll" },
+    { key: "salary-sheet", label: "Salary Sheet" },
+    { key: "advance-report", label: "Advances" },
+    { key: "labour-report", label: "Labour" },
+    { key: "invoice-status", label: "Invoice Status" },
   ];
 
   return (
@@ -205,6 +232,21 @@ export default function AccountingReportsPage() {
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={costsRange.to} onChange={e => setCostsRange({ ...costsRange, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
+            {tab === "salary-sheet" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Month</p><Select value={salarySheetFilter.month} onChange={val => setSalarySheetFilter({ ...salarySheetFilter, month: val})} options={[{ label: "All Months", value: "" }, ...months.map((m, i) => ({ label: m, value: String(i + 1) }))]} className="w-[130px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={salarySheetFilter.year} onChange={e => setSalarySheetFilter({ ...salarySheetFilter, year: e.target.value })} min="2020" max="2030" className="w-[100px]" /></div>
+              </>
+            )}
+            {tab === "advance-report" && (
+              <div className="space-y-1"><p className="text-xs text-muted-foreground">Status</p><Select value={advanceReportFilter.status} onChange={val => setAdvanceReportFilter({ status: val })} options={[{ label: "All", value: "all" }, { label: "Outstanding", value: "outstanding" }, { label: "Cleared", value: "cleared" }]} className="w-[140px]" /></div>
+            )}
+            {(tab === "labour-report" || tab === "invoice-status") && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={tab === "labour-report" ? labourRange.from : invoiceStatusRange.from} onChange={e => tab === "labour-report" ? setLabourRange({ ...labourRange, from: e.target.value }) : setInvoiceStatusRange({ ...invoiceStatusRange, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={tab === "labour-report" ? labourRange.to : invoiceStatusRange.to} onChange={e => tab === "labour-report" ? setLabourRange({ ...labourRange, to: e.target.value }) : setInvoiceStatusRange({ ...invoiceStatusRange, to: e.target.value })} className="w-[150px]" /></div>
+              </>
+            )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
           </div>
         )}
@@ -220,7 +262,7 @@ export default function AccountingReportsPage() {
         ) : tab === "receivables" ? (
           <ReceivableReport data={data as unknown as ReceivableData} onExport={exportCSV} />
         ) : tab === "payroll" ? (
-          <PayrollReport data={data as unknown as PayrollData} />
+          <PayrollReport data={data as unknown as PayrollData} onExport={exportCSV} />
         ) : tab === "monthly" ? (
           <MonthlyReport data={data as unknown as MonthlyData} onExport={exportCSV} />
         ) : tab === "expenses" ? (
@@ -237,6 +279,14 @@ export default function AccountingReportsPage() {
           <CostAnalysisReport data={data as unknown as CostAnalysisData} onExport={exportCSV} />
         ) : tab === "annual-payroll" ? (
           <AnnualPayrollReport data={data as unknown as AnnualPayrollData} onExport={exportCSV} />
+        ) : tab === "salary-sheet" ? (
+          <SalarySheetReport data={data as unknown as SalarySheetData} onExport={exportCSV} />
+        ) : tab === "advance-report" ? (
+          <AdvanceReportComp data={data as unknown as AdvanceReportData} onExport={exportCSV} />
+        ) : tab === "labour-report" ? (
+          <LabourReportComp data={data as unknown as LabourReportData} onExport={exportCSV} />
+        ) : tab === "invoice-status" ? (
+          <InvoiceStatusReport data={data as unknown as InvoiceStatusData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -439,14 +489,23 @@ interface PayrollData {
   totalSalaries: number; totalAdvances: number; totalRepaid: number; outstandingAdvances: number; totalLabour: number;
 }
 
-function PayrollReport({ data }: { data: PayrollData }) {
+function PayrollReport({ data, onExport }: { data: PayrollData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Type", "Employee/Worker", "Period", "Amount", "Notes"],
+    ...data.salaries.map(s => ["Salary", s.employee.name, `${months[s.month - 1]} ${s.year}`, s.netSalary, s.isPaid ? "Paid" : "Unpaid"]),
+    ...data.labour.map(l => ["Labour", l.workerName, new Date(l.paymentDate).toLocaleDateString(), l.amount, ""]),
+    ...data.advances.map(a => ["Advance", a.employee.name, "", a.amount, `Repaid: ${a.repaid}`]),
+  ];
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatBox label="Total Salaries" value={`Rs ${fmt(data.totalSalaries)}`} color="text-blue-600" />
-        <StatBox label="Total Labour" value={`Rs ${fmt(data.totalLabour)}`} color="text-purple-600" />
-        <StatBox label="Advances Given" value={`Rs ${fmt(data.totalAdvances)}`} color="text-amber-600" />
-        <StatBox label="Outstanding Advances" value={`Rs ${fmt(data.outstandingAdvances)}`} color={data.outstandingAdvances > 0 ? "text-red-600" : "text-emerald-600"} />
+      <div className="flex items-center justify-between">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 mr-4">
+          <StatBox label="Total Salaries" value={`Rs ${fmt(data.totalSalaries)}`} color="text-blue-600" />
+          <StatBox label="Total Labour" value={`Rs ${fmt(data.totalLabour)}`} color="text-purple-600" />
+          <StatBox label="Advances Given" value={`Rs ${fmt(data.totalAdvances)}`} color="text-amber-600" />
+          <StatBox label="Outstanding Advances" value={`Rs ${fmt(data.outstandingAdvances)}`} color={data.outstandingAdvances > 0 ? "text-red-600" : "text-emerald-600"} />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "payroll-report.csv")} className="gap-2 cursor-pointer print:hidden shrink-0"><Download className="w-4 h-4" /> Export CSV</Button>
       </div>
       {data.salaries.length > 0 && (
         <div>
@@ -1000,6 +1059,275 @@ function StatBox({ label, value, color }: { label: string; value: string; color:
     <div className="bg-background rounded-xl border border-border p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={`text-lg font-bold mt-1 ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+interface SalarySheetData {
+  salarySheet: Array<{ id: number; employee: string; designation: string; period: string; baseSalary: number; advanceDeducted: number; netSalary: number; isPaid: boolean; account: string; note: string }>;
+  totalGross: number; totalDeductions: number; totalNet: number; paidCount: number; unpaidCount: number;
+}
+function SalarySheetReport({ data, onExport }: { data: SalarySheetData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Employee", "Designation", "Period", "Base Salary", "Advance Deducted", "Net Salary", "Status", "Account", "Note"],
+    ...data.salarySheet.map(r => [r.employee, r.designation, r.period, r.baseSalary, r.advanceDeducted, r.netSalary, r.isPaid ? "Paid" : "Unpaid", r.account, r.note]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3 flex-wrap">
+          <StatBox label="Total Gross" value={`Rs ${fmt(data.totalGross)}`} color="text-blue-600" />
+          <StatBox label="Total Deductions" value={`Rs ${fmt(data.totalDeductions)}`} color="text-amber-600" />
+          <StatBox label="Total Net" value={`Rs ${fmt(data.totalNet)}`} color="text-emerald-600" />
+          <StatBox label="Paid" value={String(data.paidCount)} color="text-emerald-600" />
+          <StatBox label="Unpaid" value={String(data.unpaidCount)} color="text-red-500" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "salary-sheet.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      {data.salarySheet.length === 0 ? <div className="text-center py-12 text-muted-foreground">No salary records found.</div> : (
+        <div className="bg-background rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b border-border"><tr>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Period</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deducted</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Paid From</th>
+              <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+            </tr></thead>
+            <tbody className="divide-y divide-border">
+              {data.salarySheet.map(r => (
+                <tr key={r.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5"><p className="font-medium">{r.employee}</p>{r.designation && <p className="text-xs text-muted-foreground">{r.designation}</p>}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{r.period}</td>
+                  <td className="px-4 py-2.5 text-right">Rs {fmt(r.baseSalary)}</td>
+                  <td className="px-4 py-2.5 text-right text-amber-600">{r.advanceDeducted > 0 ? `-Rs ${fmt(r.advanceDeducted)}` : "—"}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">Rs {fmt(r.netSalary)}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.account}</td>
+                  <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.isPaid ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>{r.isPaid ? "Paid" : "Unpaid"}</span></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t-2 border-border bg-muted/30">
+              <tr>
+                <td className="px-4 py-2.5 font-semibold" colSpan={2}>Total</td>
+                <td className="px-4 py-2.5 text-right font-semibold">Rs {fmt(data.totalGross)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold text-amber-600">-Rs {fmt(data.totalDeductions)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">Rs {fmt(data.totalNet)}</td>
+                <td colSpan={2}></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface AdvanceReportData {
+  advances: Array<{ id: number; employee: string; designation: string; date: string; reason: string; account: string; amount: number; repaid: number; balance: number; status: string }>;
+  totalGiven: number; totalRepaid: number; totalOutstanding: number;
+  byEmployee: Array<{ name: string; totalGiven: number; totalRepaid: number; balance: number }>;
+}
+function AdvanceReportComp({ data, onExport }: { data: AdvanceReportData; onExport: (rows: unknown[][], file: string) => void }) {
+  const [view, setView] = React.useState<"detail" | "summary">("detail");
+  const csvRows = [
+    ["Employee", "Date", "Reason", "Account", "Amount", "Repaid", "Balance", "Status"],
+    ...data.advances.map(a => [a.employee, new Date(a.date).toLocaleDateString(), a.reason, a.account, a.amount, a.repaid, a.balance, a.status]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3 flex-wrap">
+          <StatBox label="Total Given" value={`Rs ${fmt(data.totalGiven)}`} color="text-blue-600" />
+          <StatBox label="Total Repaid" value={`Rs ${fmt(data.totalRepaid)}`} color="text-emerald-600" />
+          <StatBox label="Outstanding" value={`Rs ${fmt(data.totalOutstanding)}`} color="text-amber-600" />
+        </div>
+        <div className="flex gap-2">
+          <div className="flex gap-1 rounded-lg border border-border p-0.5">
+            <button onClick={() => setView("detail")} className={`px-3 py-1.5 text-xs rounded-md cursor-pointer ${view === "detail" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>Detail</button>
+            <button onClick={() => setView("summary")} className={`px-3 py-1.5 text-xs rounded-md cursor-pointer ${view === "summary" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>By Employee</button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "advance-report.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+        </div>
+      </div>
+      {view === "detail" ? (
+        data.advances.length === 0 ? <div className="text-center py-12 text-muted-foreground">No advance records found.</div> : (
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b border-border"><tr>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Reason</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Repaid</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Balance</th>
+                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+              </tr></thead>
+              <tbody className="divide-y divide-border">
+                {data.advances.map(a => (
+                  <tr key={a.id} className="hover:bg-muted/30">
+                    <td className="px-4 py-2.5 text-muted-foreground">{new Date(a.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-2.5 font-medium">{a.employee}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{a.reason || "—"}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold">Rs {fmt(a.amount)}</td>
+                    <td className="px-4 py-2.5 text-right text-emerald-600">Rs {fmt(a.repaid)}</td>
+                    <td className={`px-4 py-2.5 text-right font-semibold ${a.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(a.balance)}</td>
+                    <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${a.status === "cleared" ? "bg-emerald-100 text-emerald-700" : a.status === "partial" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{a.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        <div className="bg-background rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b border-border"><tr>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total Given</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total Repaid</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Outstanding</th>
+            </tr></thead>
+            <tbody className="divide-y divide-border">
+              {data.byEmployee.map((e, i) => (
+                <tr key={i} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5 font-medium">{e.name}</td>
+                  <td className="px-4 py-2.5 text-right">Rs {fmt(e.totalGiven)}</td>
+                  <td className="px-4 py-2.5 text-right text-emerald-600">Rs {fmt(e.totalRepaid)}</td>
+                  <td className={`px-4 py-2.5 text-right font-semibold ${e.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(e.balance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LabourReportData {
+  from: string; to: string;
+  payments: Array<{ id: number; date: string; description: string; account: string; amount: number; note: string }>;
+  totalAmount: number; paymentCount: number;
+  byAccount: Array<{ account: string; amount: number; count: number }>;
+}
+function LabourReportComp({ data, onExport }: { data: LabourReportData; onExport: (rows: unknown[][], file: string) => void }) {
+  const csvRows = [
+    ["Date", "Description", "Account", "Amount", "Note"],
+    ...data.payments.map(p => [new Date(p.date).toLocaleDateString(), p.description, p.account, p.amount, p.note]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3 flex-wrap">
+          <StatBox label="Total Labour Cost" value={`Rs ${fmt(data.totalAmount)}`} color="text-blue-600" />
+          <StatBox label="Payments" value={String(data.paymentCount)} color="text-muted-foreground" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "labour-report.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      {data.byAccount.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {data.byAccount.map((a, i) => <StatBox key={i} label={a.account} value={`Rs ${fmt(a.amount)}`} color="text-foreground" />)}
+        </div>
+      )}
+      {data.payments.length === 0 ? <div className="text-center py-12 text-muted-foreground">No labour payments in this period.</div> : (
+        <div className="bg-background rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b border-border"><tr>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Description</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th>
+            </tr></thead>
+            <tbody className="divide-y divide-border">
+              {data.payments.map(p => (
+                <tr key={p.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5 text-muted-foreground">{new Date(p.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5">{p.description || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{p.account}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold">Rs {fmt(p.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t-2 border-border bg-muted/30">
+              <tr>
+                <td className="px-4 py-2 font-semibold" colSpan={3}>Total</td>
+                <td className="px-4 py-2 text-right font-semibold">Rs {fmt(data.totalAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface InvoiceStatusData {
+  from: string; to: string; invoiceCount: number; totalSales: number; totalCollected: number; totalPending: number; totalDiscount: number;
+  statusSummary: Array<{ status: string; count: number; totalAmount: number; totalDiscount: number; totalPaid: number; netAmount: number }>;
+  invoices: Array<{ id: number; invoiceNo: string; date: string; customer: string; totalAmount: number; discount: number; netAmount: number; paidAmount: number; balance: number; status: string; lastPayment: string | null }>;
+}
+function InvoiceStatusReport({ data, onExport }: { data: InvoiceStatusData; onExport: (rows: unknown[][], file: string) => void }) {
+  const statusColors: Record<string, string> = { paid: "bg-emerald-100 text-emerald-700", partial: "bg-amber-100 text-amber-700", unpaid: "bg-red-100 text-red-700" };
+  const csvRows = [
+    ["Invoice No", "Date", "Customer", "Total", "Discount", "Net", "Paid", "Balance", "Status"],
+    ...data.invoices.map(i => [i.invoiceNo, new Date(i.date).toLocaleDateString(), i.customer, i.totalAmount, i.discount, i.netAmount, i.paidAmount, i.balance, i.status]),
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3 flex-wrap">
+          <StatBox label="Total Sales" value={`Rs ${fmt(data.totalSales)}`} color="text-blue-600" />
+          <StatBox label="Collected" value={`Rs ${fmt(data.totalCollected)}`} color="text-emerald-600" />
+          <StatBox label="Pending" value={`Rs ${fmt(data.totalPending)}`} color="text-amber-600" />
+          <StatBox label="Discount" value={`Rs ${fmt(data.totalDiscount)}`} color="text-muted-foreground" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "invoice-status.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      {data.statusSummary.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {data.statusSummary.map(s => (
+            <div key={s.status} className="bg-background rounded-xl border border-border p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[s.status] || "bg-muted text-foreground"}`}>{s.status}</span>
+                <span className="text-xs text-muted-foreground">{s.count} invoice{s.count !== 1 ? "s" : ""}</span>
+              </div>
+              <p className="text-lg font-bold">Rs {fmt(s.netAmount)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Paid: Rs {fmt(s.totalPaid)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.invoices.length === 0 ? <div className="text-center py-12 text-muted-foreground">No invoices found in this period.</div> : (
+        <div className="bg-background rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b border-border"><tr>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Invoice</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Paid</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Balance</th>
+              <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+            </tr></thead>
+            <tbody className="divide-y divide-border">
+              {data.invoices.map(inv => (
+                <tr key={inv.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5 font-medium">{inv.invoiceNo}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{new Date(inv.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5">{inv.customer}</td>
+                  <td className="px-4 py-2.5 text-right">Rs {fmt(inv.netAmount)}</td>
+                  <td className="px-4 py-2.5 text-right text-emerald-600">Rs {fmt(inv.paidAmount)}</td>
+                  <td className={`px-4 py-2.5 text-right font-semibold ${inv.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(inv.balance)}</td>
+                  <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[inv.status] || "bg-muted text-foreground"}`}>{inv.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

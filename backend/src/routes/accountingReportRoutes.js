@@ -17,6 +17,10 @@ const {
   getCostAnalysis,
   getAnnualPayroll,
   exportCsv,
+  getSalarySheet,
+  getAdvanceReport,
+  getLabourReport,
+  getInvoiceStatus,
 } = require('../controllers/accountingReportController');
 
 const adminAuth = [authenticate, authorize('admin')];
@@ -36,5 +40,9 @@ router.get('/sales', ...adminAuth, getSalesReport);
 router.get('/cost-analysis', ...adminAuth, getCostAnalysis);
 router.get('/annual-payroll', ...adminAuth, getAnnualPayroll);
 router.get('/export', ...adminAuth, exportCsv);
+router.get('/salary-sheet', ...adminAuth, getSalarySheet);
+router.get('/advance-report', ...adminAuth, getAdvanceReport);
+router.get('/labour-report', ...adminAuth, getLabourReport);
+router.get('/invoice-status', ...adminAuth, getInvoiceStatus);
 
 module.exports = router;
