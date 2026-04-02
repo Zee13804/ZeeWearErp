@@ -11,26 +11,16 @@ const getAccounts = async (req, res) => {
     });
 
     const enriched = await Promise.all(accounts.map(async (acc) => {
-      const inflow = await prisma.invoicePayment.aggregate({
-        where: { accountId: acc.id },
-        _sum: { amount: true },
-      });
-      const expOutflow = await prisma.expense.aggregate({
-        where: { accountId: acc.id },
-        _sum: { amount: true },
-      });
-      const supplierOutflow = await prisma.supplierPayment.aggregate({
-        where: { accountId: acc.id },
-        _sum: { amount: true },
-      });
-      const transfersIn = await prisma.accountTransfer.aggregate({
-        where: { toAccountId: acc.id },
-        _sum: { amount: true },
-      });
-      const transfersOut = await prisma.accountTransfer.aggregate({
-        where: { fromAccountId: acc.id },
-        _sum: { amount: true },
-      });
+      const [inflow, expOutflow, supplierOutflow, transfersIn, transfersOut, advanceOut, salaryOut, labourOut] = await Promise.all([
+        prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.advance.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true }, _sum: { netSalary: true } }),
+        prisma.labourPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+      ]);
 
       const balance =
         acc.openingBalance +
@@ -38,7 +28,10 @@ const getAccounts = async (req, res) => {
         (transfersIn._sum.amount || 0) -
         (expOutflow._sum.amount || 0) -
         (supplierOutflow._sum.amount || 0) -
-        (transfersOut._sum.amount || 0);
+        (transfersOut._sum.amount || 0) -
+        (advanceOut._sum.amount || 0) -
+        (salaryOut._sum.netSalary || 0) -
+        (labourOut._sum.amount || 0);
 
       return { ...acc, balance: Math.round(balance * 100) / 100 };
     }));
@@ -95,6 +88,132 @@ const deleteAccount = async (req, res) => {
     return res.json({ message: 'Account deleted' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete account', details: err.message });
+  }
+};
+
+// ── Per-Account Ledger ────────────────────────────────────
+
+const getAccountLedger = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dateFrom, dateTo } = req.query;
+    const accountId = parseInt(id);
+
+    const dateFilter = {};
+    if (dateFrom || dateTo) {
+      if (dateFrom) dateFilter.gte = new Date(dateFrom);
+      if (dateTo) { const d = new Date(dateTo); d.setHours(23,59,59,999); dateFilter.lte = d; }
+    }
+
+    const [account, invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours] = await Promise.all([
+      prisma.account.findUnique({ where: { id: accountId }, select: { id: true, name: true, type: true, openingBalance: true } }),
+      prisma.invoicePayment.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { paymentDate: dateFilter }) },
+        include: { invoice: { select: { invoiceNo: true, customer: { select: { name: true } } } } },
+        orderBy: { paymentDate: 'asc' },
+      }),
+      prisma.expense.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { expenseDate: dateFilter }) },
+        include: { category: { select: { name: true } } },
+        orderBy: { expenseDate: 'asc' },
+      }),
+      prisma.supplierPayment.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { paymentDate: dateFilter }) },
+        include: { supplier: { select: { name: true } } },
+        orderBy: { paymentDate: 'asc' },
+      }),
+      prisma.accountTransfer.findMany({
+        where: { toAccountId: accountId, ...(Object.keys(dateFilter).length && { date: dateFilter }) },
+        include: { fromAccount: { select: { name: true } } },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.accountTransfer.findMany({
+        where: { fromAccountId: accountId, ...(Object.keys(dateFilter).length && { date: dateFilter }) },
+        include: { toAccount: { select: { name: true } } },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.advance.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { advanceDate: dateFilter }) },
+        include: { employee: { select: { name: true } } },
+        orderBy: { advanceDate: 'asc' },
+      }),
+      prisma.salaryRecord.findMany({
+        where: { accountId, isPaid: true, ...(Object.keys(dateFilter).length && { paidAt: dateFilter }) },
+        include: { employee: { select: { name: true } } },
+        orderBy: { paidAt: 'asc' },
+      }),
+      prisma.labourPayment.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { paymentDate: dateFilter }) },
+        orderBy: { paymentDate: 'asc' },
+      }),
+    ]);
+
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    // Build unified transaction list
+    const transactions = [];
+
+    invoicePayments.forEach(p => transactions.push({
+      id: `inv-${p.id}`, date: p.paymentDate, type: 'credit',
+      description: `Invoice payment – ${p.invoice?.invoiceNo} (${p.invoice?.customer?.name})`,
+      amount: p.amount, note: p.note,
+    }));
+
+    expenses.forEach(p => transactions.push({
+      id: `exp-${p.id}`, date: p.expenseDate, type: 'debit',
+      description: `Expense – ${p.category?.name}: ${p.description}`,
+      amount: p.amount, note: null,
+    }));
+
+    supplierPayments.forEach(p => transactions.push({
+      id: `sup-${p.id}`, date: p.paymentDate, type: 'debit',
+      description: `Supplier payment – ${p.supplier?.name}`,
+      amount: p.amount, note: p.note,
+    }));
+
+    transfersIn.forEach(p => transactions.push({
+      id: `tin-${p.id}`, date: p.date, type: 'credit',
+      description: `Transfer from ${p.fromAccount?.name}`,
+      amount: p.amount, note: p.note,
+    }));
+
+    transfersOut.forEach(p => transactions.push({
+      id: `tout-${p.id}`, date: p.date, type: 'debit',
+      description: `Transfer to ${p.toAccount?.name}`,
+      amount: p.amount, note: p.note,
+    }));
+
+    advances.forEach(p => transactions.push({
+      id: `adv-${p.id}`, date: p.advanceDate, type: 'debit',
+      description: `Advance – ${p.employee?.name}`,
+      amount: p.amount, note: p.reason,
+    }));
+
+    salaries.forEach(p => transactions.push({
+      id: `sal-${p.id}`, date: p.paidAt || p.createdAt, type: 'debit',
+      description: `Salary – ${p.employee?.name} (${p.month}/${p.year})`,
+      amount: p.netSalary, note: p.note,
+    }));
+
+    labours.forEach(p => transactions.push({
+      id: `lab-${p.id}`, date: p.paymentDate, type: 'debit',
+      description: `Labour – ${p.workerName}`,
+      amount: p.amount, note: p.description,
+    }));
+
+    // Sort by date
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Running balance
+    let running = account.openingBalance;
+    const ledger = transactions.map(t => {
+      running += t.type === 'credit' ? t.amount : -t.amount;
+      return { ...t, runningBalance: Math.round(running * 100) / 100 };
+    });
+
+    return res.json({ account, openingBalance: account.openingBalance, ledger, closingBalance: Math.round(running * 100) / 100 });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch ledger', details: err.message });
   }
 };
 
@@ -162,5 +281,6 @@ const deleteTransfer = async (req, res) => {
 
 module.exports = {
   getAccounts, createAccount, updateAccount, deleteAccount,
+  getAccountLedger,
   getTransfers, createTransfer, deleteTransfer,
 };

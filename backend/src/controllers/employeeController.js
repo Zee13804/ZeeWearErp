@@ -110,7 +110,7 @@ const getAdvances = async (req, res) => {
 
 const createAdvance = async (req, res) => {
   try {
-    const { employeeId, amount, reason, advanceDate } = req.body;
+    const { employeeId, amount, reason, advanceDate, accountId } = req.body;
     if (!employeeId || !amount) return res.status(400).json({ error: 'employeeId and amount are required' });
 
     const advance = await prisma.advance.create({
@@ -119,6 +119,7 @@ const createAdvance = async (req, res) => {
         amount: parseFloat(amount),
         reason: reason || null,
         advanceDate: advanceDate ? new Date(advanceDate) : new Date(),
+        ...(accountId && { accountId: parseInt(accountId) }),
       },
       include: { employee: { select: { id: true, name: true } } },
     });
@@ -177,13 +178,14 @@ const getSalaries = async (req, res) => {
 
 const createSalary = async (req, res) => {
   try {
-    const { employeeId, month, year, baseSalary, advanceDeducted, note } = req.body;
+    const { employeeId, month, year, baseSalary, advanceDeducted, note, accountId, markPaid } = req.body;
     if (!employeeId || !month || !year || !baseSalary)
       return res.status(400).json({ error: 'employeeId, month, year and baseSalary are required' });
 
     const base = parseFloat(baseSalary);
     const deducted = advanceDeducted ? parseFloat(advanceDeducted) : 0;
     const net = base - deducted;
+    const paid = markPaid === true || markPaid === 'true';
 
     const salary = await prisma.salaryRecord.create({
       data: {
@@ -194,6 +196,9 @@ const createSalary = async (req, res) => {
         advanceDeducted: deducted,
         netSalary: net,
         note: note || null,
+        isPaid: paid,
+        paidAt: paid ? new Date() : null,
+        ...(accountId && { accountId: parseInt(accountId) }),
       },
       include: { employee: { select: { id: true, name: true } } },
     });
@@ -207,9 +212,14 @@ const createSalary = async (req, res) => {
 const markSalaryPaid = async (req, res) => {
   try {
     const { id } = req.params;
+    const { accountId } = req.body;
     const salary = await prisma.salaryRecord.update({
       where: { id: parseInt(id) },
-      data: { isPaid: true, paidAt: new Date() },
+      data: {
+        isPaid: true,
+        paidAt: new Date(),
+        ...(accountId && { accountId: parseInt(accountId) }),
+      },
     });
     return res.json({ message: 'Salary marked as paid', salary });
   } catch (err) {
@@ -252,7 +262,7 @@ const getLabourPayments = async (req, res) => {
 
 const createLabourPayment = async (req, res) => {
   try {
-    const { workerName, description, amount, weekStart, weekEnd, paymentDate } = req.body;
+    const { workerName, description, amount, weekStart, weekEnd, paymentDate, accountId } = req.body;
     if (!workerName || !amount) return res.status(400).json({ error: 'workerName and amount are required' });
 
     const payment = await prisma.labourPayment.create({
@@ -263,6 +273,7 @@ const createLabourPayment = async (req, res) => {
         weekStart: weekStart ? new Date(weekStart) : null,
         weekEnd: weekEnd ? new Date(weekEnd) : null,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+        ...(accountId && { accountId: parseInt(accountId) }),
       },
     });
     return res.status(201).json({ message: 'Labour payment recorded', payment });

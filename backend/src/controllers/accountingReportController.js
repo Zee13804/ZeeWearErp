@@ -14,6 +14,8 @@ const getDashboard = async (req, res) => {
       monthlyRevenue,
       monthlyExpenses,
       monthlyPurchases,
+      monthlyLabour,
+      monthlySalaries,
       pendingInvoices,
       supplierBalances,
     ] = await Promise.all([
@@ -21,6 +23,8 @@ const getDashboard = async (req, res) => {
       prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: monthStart, lte: monthEnd } }, _sum: { amount: true } }),
       prisma.expense.aggregate({ where: { expenseDate: { gte: monthStart, lte: monthEnd } }, _sum: { amount: true } }),
       prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: monthStart, lte: monthEnd } }, _sum: { totalAmount: true } }),
+      prisma.labourPayment.aggregate({ where: { paymentDate: { gte: monthStart, lte: monthEnd } }, _sum: { amount: true } }),
+      prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: monthStart, lte: monthEnd } }, _sum: { netSalary: true } }),
       prisma.invoice.findMany({ where: { status: { in: ['unpaid', 'partial'] } }, select: { totalAmount: true, paidAmount: true, discount: true } }),
       prisma.supplier.findMany({ where: { isActive: true }, select: { id: true } }),
     ]);
@@ -35,12 +39,19 @@ const getDashboard = async (req, res) => {
     }
 
     const accountDetails = await Promise.all(accounts.map(async (acc) => {
-      const inflow = await prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } });
-      const expOut = await prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } });
-      const supOut = await prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } });
-      const tIn = await prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id }, _sum: { amount: true } });
-      const tOut = await prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id }, _sum: { amount: true } });
-      const balance = acc.openingBalance + (inflow._sum.amount || 0) + (tIn._sum.amount || 0) - (expOut._sum.amount || 0) - (supOut._sum.amount || 0) - (tOut._sum.amount || 0);
+      const [inflow, expOut, supOut, tIn, tOut, advOut, salOut, labOut] = await Promise.all([
+        prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { toAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.accountTransfer.aggregate({ where: { fromAccountId: acc.id }, _sum: { amount: true } }),
+        prisma.advance.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+        prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true }, _sum: { netSalary: true } }),
+        prisma.labourPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
+      ]);
+      const balance = acc.openingBalance + (inflow._sum.amount || 0) + (tIn._sum.amount || 0)
+        - (expOut._sum.amount || 0) - (supOut._sum.amount || 0) - (tOut._sum.amount || 0)
+        - (advOut._sum.amount || 0) - (salOut._sum.netSalary || 0) - (labOut._sum.amount || 0);
       return { id: acc.id, name: acc.name, type: acc.type, balance: Math.round(balance * 100) / 100 };
     }));
 
@@ -51,6 +62,8 @@ const getDashboard = async (req, res) => {
       monthlyRevenue: monthlyRevenue._sum.amount || 0,
       monthlyExpenses: monthlyExpenses._sum.amount || 0,
       monthlyPurchases: monthlyPurchases._sum.totalAmount || 0,
+      monthlyLabour: monthlyLabour._sum.amount || 0,
+      monthlySalaries: monthlySalaries._sum.netSalary || 0,
       pendingReceivable: Math.round(pendingAmount * 100) / 100,
       supplierDebt: Math.round(supplierDebt * 100) / 100,
       accounts: accountDetails,
@@ -78,7 +91,7 @@ const getLedger = async (req, res) => {
     const accFilter = accountId ? { accountId: parseInt(accountId) } : {};
     const range = makeRange();
 
-    const [invoicePayments, expenses, supplierPayments, transfersIn, transfersOut] = await Promise.all([
+    const [invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours] = await Promise.all([
       prisma.invoicePayment.findMany({
         where: { ...accFilter, ...(range ? { paymentDate: range } : {}) },
         include: { invoice: { select: { invoiceNo: true, customer: { select: { name: true } } } }, account: { select: { name: true } } },
@@ -99,6 +112,18 @@ const getLedger = async (req, res) => {
         where: { ...(accountId ? { fromAccountId: parseInt(accountId) } : {}), ...(range ? { date: range } : {}) },
         include: { fromAccount: { select: { name: true } }, toAccount: { select: { name: true } } },
       }),
+      prisma.advance.findMany({
+        where: { ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { advanceDate: range } : {}) },
+        include: { employee: { select: { name: true } }, account: { select: { name: true } } },
+      }),
+      prisma.salaryRecord.findMany({
+        where: { isPaid: true, ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { paidAt: range } : {}) },
+        include: { employee: { select: { name: true } }, account: { select: { name: true } } },
+      }),
+      prisma.labourPayment.findMany({
+        where: { ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { paymentDate: range } : {}) },
+        include: { account: { select: { name: true } } },
+      }),
     ]);
 
     const entries = [];
@@ -117,6 +142,15 @@ const getLedger = async (req, res) => {
     }
     for (const t of transfersOut) {
       entries.push({ date: t.date, type: 'OUT', category: 'Transfer Out', account: t.fromAccount?.name, description: `To ${t.toAccount.name}`, amount: t.amount });
+    }
+    for (const a of advances) {
+      entries.push({ date: a.advanceDate, type: 'OUT', category: 'Employee Advance', account: a.account?.name || '—', description: `Advance – ${a.employee.name}`, amount: a.amount });
+    }
+    for (const s of salaries) {
+      entries.push({ date: s.paidAt || s.createdAt, type: 'OUT', category: 'Salary', account: s.account?.name || '—', description: `Salary – ${s.employee.name} (${s.month}/${s.year})`, amount: s.netSalary });
+    }
+    for (const l of labours) {
+      entries.push({ date: l.paymentDate, type: 'OUT', category: 'Labour Payment', account: l.account?.name || '—', description: `Labour – ${l.workerName}`, amount: l.amount });
     }
 
     entries.sort((a, b) => new Date(b.date) - new Date(a.date));

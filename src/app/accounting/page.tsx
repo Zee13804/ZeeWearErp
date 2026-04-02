@@ -14,6 +14,8 @@ interface DashboardData {
   monthlyRevenue: number;
   monthlyExpenses: number;
   monthlyPurchases: number;
+  monthlyLabour: number;
+  monthlySalaries: number;
   pendingReceivable: number;
   supplierDebt: number;
   accounts: Array<{ id: number; name: string; type: string; balance: number }>;
@@ -74,13 +76,33 @@ export default function AccountingDashboard() {
           </div>
         ) : data ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard icon={Wallet} label="Total Cash & Bank" value={fmt(data.totalCash)} color="text-emerald-600" sub="All accounts combined" />
               <StatCard icon={TrendingUp} label="This Month Revenue" value={fmt(data.monthlyRevenue)} color="text-blue-600" sub="Invoice payments received" />
-              <StatCard icon={TrendingDown} label="This Month Expenses" value={fmt(data.monthlyExpenses)} color="text-red-600" sub="Business expenses" />
-              <StatCard icon={ShoppingCart} label="This Month Purchases" value={fmt(data.monthlyPurchases)} color="text-orange-600" sub="Supplier purchases" />
               <StatCard icon={AlertCircle} label="Pending Receivable" value={fmt(data.pendingReceivable)} color="text-amber-600" sub="Unpaid invoices" />
               <StatCard icon={Briefcase} label="Supplier Debt" value={fmt(data.supplierDebt)} color="text-purple-600" sub="Amount owed to suppliers" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-background rounded-xl border border-border p-4">
+                <p className="text-xs text-muted-foreground">Monthly Expenses</p>
+                <p className="text-lg font-bold text-red-600 mt-1">Rs {fmt(data.monthlyExpenses)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Business expenses</p>
+              </div>
+              <div className="bg-background rounded-xl border border-border p-4">
+                <p className="text-xs text-muted-foreground">Monthly Purchases</p>
+                <p className="text-lg font-bold text-orange-600 mt-1">Rs {fmt(data.monthlyPurchases)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Supplier purchases</p>
+              </div>
+              <div className="bg-background rounded-xl border border-border p-4">
+                <p className="text-xs text-muted-foreground">Monthly Salaries</p>
+                <p className="text-lg font-bold text-violet-600 mt-1">Rs {fmt(data.monthlySalaries)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Salary disbursed</p>
+              </div>
+              <div className="bg-background rounded-xl border border-border p-4">
+                <p className="text-xs text-muted-foreground">Monthly Labour</p>
+                <p className="text-lg font-bold text-sky-600 mt-1">Rs {fmt(data.monthlyLabour)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Labour payments</p>
+              </div>
             </div>
 
             {data.accounts.length > 0 && (
