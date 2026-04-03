@@ -1,0 +1,63 @@
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# cd /www/wwwroot/zeewear.devoriatech.com && export PATH=/www/server/nodejs/v20.20.2/bin:$PATH && npm install && npm run build
+
+removed 1 package, and audited 219 packages in 3s
+
+44 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (1 moderate, 2 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> dashboard-app@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.6s
+✓ Finished TypeScript in 6.1s    
+✓ Collecting page data using 3 workers in 407.9ms    
+✓ Generating static pages using 3 workers (20/20) in 355.1ms
+✓ Finalizing page optimization in 15.3ms    
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /accessories
+├ ○ /accounting
+├ ○ /accounting/accounts
+├ ○ /accounting/employees
+├ ○ /accounting/expenses
+├ ○ /accounting/invoices
+├ ○ /accounting/reports
+├ ○ /accounting/suppliers
+├ ○ /articles
+├ ƒ /articles/[id]
+├ ○ /dashboard
+├ ○ /fabric
+├ ○ /import
+├ ○ /login
+├ ○ /reports
+├ ○ /settings
+├ ○ /users
+└ ○ /variants
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# pm2 restart zeewear
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [zeewear](ids: [ 0 ])
+[PM2] [zeewear](0) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ zeewear    │ default     │ N/A     │ fork    │ 299762   │ 0s     │ 636  │ online    │ 0%       │ 18.5mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴─────────────────┴──────────┴──────────┴──────────┴──────────┘
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# 
