@@ -103,6 +103,8 @@
 **Backend enforcement:** `adminAuth` middleware use hota hai create/update routes pe.
 **Frontend enforcement:** `isAdmin()` function in `src/lib/auth.ts` — returns true only for `admin` and `dev` roles.
 
+> **Note:** Role capabilities ko `RolePermission` records se aur fine-tune kiya ja sakta hai (database mein). Iska matlab hai koi specific permission kisi role se grant ya revoke ki ja sakti hai — upar ki table base defaults hai.
+
 ---
 
 ## 5. LOCAL DEVELOPMENT (REPLIT MEIN)
@@ -141,6 +143,7 @@ git push origin main
 ```
 
 > **Note:** `GITHUB_TOKEN` ek Replit secret hai. Isko kabhi copy-paste mat karo — yeh automatically environment mein hota hai.
+> **Security:** Tokenized remote URL (jo `git remote set-url` se set hota hai) shared ya public systems pe persistent mat rehne dena. Kaam khatam hone ke baad remote URL reset karo ya Replit ka built-in environment use karo.
 
 ---
 
@@ -259,10 +262,13 @@ backend/node_modules/.bin/prisma db push --schema=backend/prisma/schema.prisma
 **Step 4 — VPS pe deploy karo** (Section 7 dekhein, Step 3 zaroor include karo)
 
 ### Important Field Names (galti mat karna):
-| Model | Sahi naam | Galat naam |
-|-------|-----------|------------|
-| Employee | `baseSalary` | `basicSalary` (yeh exist nahi karta) |
-| SupplierPurchaseItem | `unit` | (unit field exist karta hai — `@default("pcs")`) |
+| Model | Sahi naam | Notes |
+|-------|-----------|-------|
+| Employee | `monthlySalary` | Employee ka monthly salary yahan store hota hai |
+| SalaryRecord | `baseSalary` | Salary disburse karne ka record — alag model hai Employee se |
+| SupplierPurchaseItem | `unit` | Unit field exist karta hai — `@default("pcs")` |
+
+> **Yaad rakhein:** `Employee` mein `monthlySalary` hota hai (ongoing salary amount), aur `SalaryRecord` mein `baseSalary` hota hai (ek particular month ki payment record).
 
 ---
 
