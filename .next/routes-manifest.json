@@ -28,6 +28,14 @@
   },
   "dynamicRoutes": [
     {
+      "page": "/accounting/production-jobs/[id]",
+      "regex": "^/accounting/production\\-jobs/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/accounting/production\\-jobs/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/articles/[id]",
       "regex": "^/articles/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -74,6 +82,12 @@
       "namedRegex": "^/accounting/accounts(?:/)?$"
     },
     {
+      "page": "/accounting/courier-payments",
+      "regex": "^/accounting/courier\\-payments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/courier\\-payments(?:/)?$"
+    },
+    {
       "page": "/accounting/employees",
       "regex": "^/accounting/employees(?:/)?$",
       "routeKeys": {},
@@ -90,6 +104,12 @@
       "regex": "^/accounting/invoices(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/accounting/invoices(?:/)?$"
+    },
+    {
+      "page": "/accounting/production-jobs",
+      "regex": "^/accounting/production\\-jobs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/accounting/production\\-jobs(?:/)?$"
     },
     {
       "page": "/accounting/reports",

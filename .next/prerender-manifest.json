@@ -98,6 +98,30 @@
         "x-next-revalidate-tag-token"
       ]
     },
+    "/accounting/courier-payments": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/accounting/courier-payments",
+      "dataRoute": "/accounting/courier-payments.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
     "/accounting/employees": {
       "experimentalBypassFor": [
         {
@@ -185,6 +209,30 @@
       "initialRevalidateSeconds": false,
       "srcRoute": "/accounting",
       "dataRoute": "/accounting.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/accounting/production-jobs": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/accounting/production-jobs",
+      "dataRoute": "/accounting/production-jobs.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -486,8 +534,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "001fe2c9a00a0e520ac05c85fc6ec6d8",
-    "previewModeSigningKey": "679844f9cfb7d3f6dd6b910e1e2e6663cbdee8c4973f3c5998a2f66856942554",
-    "previewModeEncryptionKey": "9767db5fb028b2aad1b0dd37d6e020c4723b2ebe9c76ecf0db9b73eec2e3d131"
+    "previewModeId": "85debd18ae0b858baf5f07838a0cdf18",
+    "previewModeSigningKey": "5f97cd52cfd4c36ec5312ef62c4a49eea0948f08ba0e946c5541caf2cb13d9c6",
+    "previewModeEncryptionKey": "27d4eb9cb04b9cb52a7bd0a24e802fecec63456060bbf794666fc6d0be5748f6"
   }
 }
