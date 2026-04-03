@@ -276,16 +276,14 @@ export default function ProductionJobsPage() {
           </div>
       </Dialog>
 
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete Production Job"
-          message={`Delete job for "${deleteTarget.name}"? This will fail if work entries exist.`}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-          confirmLabel="Delete"
-          variant="danger"
-        />
-      )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Production Job"
+        message={deleteTarget ? `Delete job for "${deleteTarget.name}"? This will fail if work entries exist.` : ""}
+        onConfirm={handleDelete}
+        confirmLabel="Delete"
+      />
     </DashboardLayout>
   );
 }

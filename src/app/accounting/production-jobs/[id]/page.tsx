@@ -700,27 +700,23 @@ export default function JobDetailPage() {
         </div>
       </Dialog>
 
-      {deleteEntry && (
-        <ConfirmDialog
-          title="Delete Work Entry"
-          message={`Delete "${deleteEntry.label}"?`}
-          onConfirm={handleDeleteEntry}
-          onCancel={() => setDeleteEntry(null)}
-          confirmLabel="Delete"
-          variant="danger"
-        />
-      )}
+      <ConfirmDialog
+        open={!!deleteEntry}
+        onClose={() => setDeleteEntry(null)}
+        title="Delete Work Entry"
+        message={deleteEntry ? `Delete "${deleteEntry.label}"?` : ""}
+        onConfirm={handleDeleteEntry}
+        confirmLabel="Delete"
+      />
 
-      {deletePayment && (
-        <ConfirmDialog
-          title="Delete Payment"
-          message={`Delete ${deletePayment.label}? This will credit the account back.`}
-          onConfirm={handleDeletePayment}
-          onCancel={() => setDeletePayment(null)}
-          confirmLabel="Delete"
-          variant="danger"
-        />
-      )}
+      <ConfirmDialog
+        open={!!deletePayment}
+        onClose={() => setDeletePayment(null)}
+        title="Delete Payment"
+        message={deletePayment ? `Delete ${deletePayment.label}? This will credit the account back.` : ""}
+        onConfirm={handleDeletePayment}
+        confirmLabel="Delete"
+      />
     </DashboardLayout>
   );
 }
