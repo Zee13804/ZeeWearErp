@@ -112,7 +112,7 @@ export default function CourierPaymentsPage() {
           shopifyOrderNos: form.source === "leopard" ? form.shopifyOrderNos : undefined,
           grossAmount: parseFloat(form.grossAmount) || 0,
           serviceCharge: form.source === "leopard" ? (parseFloat(form.serviceCharge) || 0) : 0,
-          netReceived: parseFloat(form.netReceived) || parseFloat(form.grossAmount) || 0,
+          netReceived: form.netReceived !== "" ? parseFloat(form.netReceived) : (parseFloat(form.grossAmount) || 0),
           paymentRef: form.paymentRef || undefined,
           accountId: parseInt(form.accountId),
           paymentDate: form.paymentDate,
@@ -171,7 +171,7 @@ export default function CourierPaymentsPage() {
         </div>
 
         {summary && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-background rounded-xl border border-border p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
@@ -180,7 +180,19 @@ export default function CourierPaymentsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Leopard Net Received</p>
                   <p className="text-2xl font-bold text-foreground">Rs {fmt(summary.leopard.totalNetReceived)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{summary.leopard.count} entries &middot; Charges: Rs {fmt(summary.leopard.totalServiceCharge)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{summary.leopard.count} entries</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-background rounded-xl border border-border p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Leopard Charges</p>
+                  <p className="text-2xl font-bold text-red-600">Rs {fmt(summary.leopard.totalServiceCharge)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Service &amp; tax deducted</p>
                 </div>
               </div>
             </div>
@@ -204,7 +216,7 @@ export default function CourierPaymentsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Net Received</p>
                   <p className="text-2xl font-bold text-emerald-600">Rs {fmt(summary.combined.totalNetReceived)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Total charges: Rs {fmt(summary.combined.totalServiceCharge)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Leopard + LAAM combined</p>
                 </div>
               </div>
             </div>
