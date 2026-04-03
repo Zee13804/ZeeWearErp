@@ -10,6 +10,7 @@ import {
   Truck, Plus, Trash2, ChevronDown, ChevronUp, ReceiptText,
   PackageCheck, AlertCircle, Loader2,
 } from "lucide-react";
+import { isAdmin } from "@/lib/auth";
 
 interface Account { id: number; name: string; }
 interface CourierPayment {
@@ -151,13 +152,7 @@ export default function CourierPaymentsPage() {
 
   const filtered = sourceFilter === "all" ? payments : payments.filter(p => p.source === sourceFilter);
 
-  const canDelete = () => {
-    try {
-      const u = JSON.parse(atob((localStorage.getItem("token") || "").split(".")[1]));
-      return u.role === "admin" || u.role === "dev";
-    } catch { return false; }
-  };
-  const isAdmin = canDelete();
+  const adminUser = isAdmin();
 
   return (
     <DashboardLayout>
@@ -282,7 +277,7 @@ export default function CourierPaymentsPage() {
                           <p className="text-xs text-red-500">-Rs {fmt(p.serviceCharge)} charges</p>
                         )}
                       </div>
-                      {isAdmin && (
+                      {adminUser && (
                         <button
                           onClick={() => setDeleteTarget({ id: p.id, label: `${p.source === "leopard" ? "Leopard" : "LAAM"} payment on ${new Date(p.paymentDate).toLocaleDateString()}` })}
                           className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"

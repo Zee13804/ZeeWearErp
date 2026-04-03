@@ -84,6 +84,10 @@ const updatePayment = async (req, res) => {
 
     const { source, shopifyOrderNos, grossAmount, serviceCharge, netReceived, paymentRef, accountId, paymentDate, notes } = req.body;
 
+    if (source && !['leopard', 'laam'].includes(source)) {
+      return res.status(400).json({ error: 'source must be "leopard" or "laam"' });
+    }
+
     const gross = grossAmount !== undefined ? parseFloat(grossAmount) : existing.grossAmount;
     const charge = serviceCharge !== undefined ? parseFloat(serviceCharge) : existing.serviceCharge;
     const net = netReceived !== undefined ? parseFloat(netReceived) : gross - charge;

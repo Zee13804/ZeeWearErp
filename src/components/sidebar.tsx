@@ -33,6 +33,8 @@ import {
   Receipt,
   CreditCard,
   TrendingUp,
+  Wrench,
+  Truck,
 } from "lucide-react";
 
 const navItems = [
@@ -53,6 +55,8 @@ const accountingSubItems = [
   { label: "Invoices", href: "/accounting/invoices", icon: UserCheck },
   { label: "Expenses", href: "/accounting/expenses", icon: Receipt },
   { label: "Employees", href: "/accounting/employees", icon: CreditCard },
+  { label: "Production Jobs", href: "/accounting/production-jobs", icon: Wrench },
+  { label: "Courier Payments", href: "/accounting/courier-payments", icon: Truck },
   { label: "Reports", href: "/accounting/reports", icon: TrendingUp },
 ];
 
