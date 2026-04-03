@@ -1245,6 +1245,79 @@ const getProductionJobsReport = async (req, res) => {
   }
 };
 
+// ── Salary Due Report ──────────────────────────────────────
+
+const getSalaryDueReport = async (req, res) => {
+  try {
+    const now = new Date();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
+    const year  = parseInt(req.query.year)  || now.getFullYear();
+
+    // All active employees with their salary records for this month
+    const employees = await prisma.employee.findMany({
+      where: { isActive: true },
+      include: {
+        salaryRecords: { where: { month, year } },
+        advances: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const report = employees.map(emp => {
+      const salaryRecord = emp.salaryRecords[0] || null;
+      const outstandingAdvance = emp.advances.reduce((s, a) => s + Math.max(0, a.amount - a.repaid), 0);
+      const baseSalary = salaryRecord ? salaryRecord.baseSalary : emp.monthlySalary;
+      const advanceDeducted = salaryRecord ? salaryRecord.advanceDeducted : Math.min(outstandingAdvance, baseSalary);
+      const netSalary = salaryRecord ? salaryRecord.netSalary : Math.max(0, baseSalary - advanceDeducted);
+      const isPaid = salaryRecord ? salaryRecord.isPaid : false;
+      const isProcessed = !!salaryRecord;
+
+      return {
+        id: emp.id,
+        name: emp.name,
+        designation: emp.designation || '',
+        monthlySalary: emp.monthlySalary,
+        baseSalary,
+        outstandingAdvance: Math.round(outstandingAdvance * 100) / 100,
+        advanceDeducted: Math.round(advanceDeducted * 100) / 100,
+        netSalary: Math.round(netSalary * 100) / 100,
+        isPaid,
+        isProcessed,
+        salaryRecordId: salaryRecord ? salaryRecord.id : null,
+        note: salaryRecord?.note || '',
+      };
+    });
+
+    const totalBase     = report.reduce((s, r) => s + r.baseSalary, 0);
+    const totalDeduct   = report.reduce((s, r) => s + r.advanceDeducted, 0);
+    const totalNet      = report.reduce((s, r) => s + r.netSalary, 0);
+    const totalPaid     = report.filter(r => r.isPaid).reduce((s, r) => s + r.netSalary, 0);
+    const totalPending  = report.filter(r => !r.isPaid).reduce((s, r) => s + r.netSalary, 0);
+
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    return res.json({
+      month,
+      year,
+      monthName: monthNames[month - 1],
+      employees: report,
+      summary: {
+        totalEmployees: report.length,
+        processedCount: report.filter(r => r.isProcessed).length,
+        paidCount: report.filter(r => r.isPaid).length,
+        unpaidCount: report.filter(r => !r.isPaid).length,
+        totalBase: Math.round(totalBase * 100) / 100,
+        totalDeduct: Math.round(totalDeduct * 100) / 100,
+        totalNet: Math.round(totalNet * 100) / 100,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        totalPending: Math.round(totalPending * 100) / 100,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch salary due report', details: err.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getLedger,
@@ -1267,4 +1340,5 @@ module.exports = {
   getInvoiceStatus,
   getSupplierLedgerReport,
   getProductionJobsReport,
+  getSalaryDueReport,
 };
