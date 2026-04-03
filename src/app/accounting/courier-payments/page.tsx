@@ -72,6 +72,7 @@ export default function CourierPaymentsPage() {
         fetch("/api/accounting/accounts", { headers: { Authorization: `Bearer ${token()}` } }),
         fetch(api("/summary"), { headers: { Authorization: `Bearer ${token()}` } }),
       ]);
+      if (!pRes.ok || !aRes.ok || !sRes.ok) throw new Error("Failed to load data");
       const [pData, aData, sData] = await Promise.all([pRes.json(), aRes.json(), sRes.json()]);
       setPayments(pData.payments || []);
       setAccounts(aData.accounts || []);
