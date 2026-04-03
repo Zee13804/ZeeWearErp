@@ -11,7 +11,7 @@ const getAccounts = async (req, res) => {
     });
 
     const enriched = await Promise.all(accounts.map(async (acc) => {
-      const [inflow, expOutflow, supplierOutflow, transfersIn, transfersOut, advanceOut, salaryOut, labourOut, outsourceOut] = await Promise.all([
+      const [inflow, expOutflow, supplierOutflow, transfersIn, transfersOut, advanceOut, salaryOut, labourOut, outsourceOut, courierIn] = await Promise.all([
         prisma.invoicePayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
         prisma.expense.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
         prisma.supplierPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
@@ -21,12 +21,14 @@ const getAccounts = async (req, res) => {
         prisma.salaryRecord.aggregate({ where: { accountId: acc.id, isPaid: true }, _sum: { netSalary: true } }),
         prisma.labourPayment.aggregate({ where: { accountId: acc.id }, _sum: { amount: true } }),
         prisma.outsourceWorkEntry.aggregate({ where: { accountId: acc.id }, _sum: { totalCost: true } }),
+        prisma.courierPayment.aggregate({ where: { accountId: acc.id }, _sum: { netReceived: true } }),
       ]);
 
       const balance =
         acc.openingBalance +
         (inflow._sum.amount || 0) +
-        (transfersIn._sum.amount || 0) -
+        (transfersIn._sum.amount || 0) +
+        (courierIn._sum.netReceived || 0) -
         (expOutflow._sum.amount || 0) -
         (supplierOutflow._sum.amount || 0) -
         (transfersOut._sum.amount || 0) -
@@ -107,7 +109,7 @@ const getAccountLedger = async (req, res) => {
       if (dateTo) { const d = new Date(dateTo); d.setHours(23,59,59,999); dateFilter.lte = d; }
     }
 
-    const [account, invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours, outsourceEntries] = await Promise.all([
+    const [account, invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours, outsourceEntries, courierPayments] = await Promise.all([
       prisma.account.findUnique({ where: { id: accountId }, select: { id: true, name: true, type: true, openingBalance: true } }),
       prisma.invoicePayment.findMany({
         where: { accountId, ...(Object.keys(dateFilter).length && { paymentDate: dateFilter }) },
@@ -152,6 +154,10 @@ const getAccountLedger = async (req, res) => {
         where: { accountId, ...(Object.keys(dateFilter).length && { workDate: dateFilter }) },
         include: { job: { select: { collection: true } } },
         orderBy: { workDate: 'asc' },
+      }),
+      prisma.courierPayment.findMany({
+        where: { accountId, ...(Object.keys(dateFilter).length && { paymentDate: dateFilter }) },
+        orderBy: { paymentDate: 'asc' },
       }),
     ]);
 
@@ -212,6 +218,12 @@ const getAccountLedger = async (req, res) => {
       id: `out-${p.id}`, date: p.workDate, type: 'debit',
       description: `Outsource – ${p.workType} by ${p.vendorName}${p.job?.collection ? ` (${p.job.collection})` : ''}`,
       amount: p.totalCost, note: p.notes,
+    }));
+
+    courierPayments.forEach(p => transactions.push({
+      id: `cur-${p.id}`, date: p.paymentDate, type: 'credit',
+      description: `${p.source === 'leopard' ? 'Leopard' : 'LAAM'} payment${p.paymentRef ? ` – ref ${p.paymentRef}` : ''}${p.serviceCharge ? ` (charge: Rs ${p.serviceCharge})` : ''}`,
+      amount: p.netReceived, note: p.notes,
     }));
 
     // Sort by date

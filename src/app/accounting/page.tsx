@@ -6,7 +6,7 @@ import { apiGet } from "@/lib/api";
 import Link from "next/link";
 import {
   Wallet, TrendingUp, TrendingDown, ShoppingCart, AlertCircle,
-  Users, FileText, Receipt, Briefcase, BarChart3, ArrowRight, Loader2, CreditCard, Wrench
+  Users, FileText, Receipt, Briefcase, BarChart3, ArrowRight, Loader2, CreditCard, Wrench, Truck
 } from "lucide-react";
 
 interface RecentTx {
@@ -59,6 +59,7 @@ const quickLinks = [
   { href: "/accounting/expenses", icon: Receipt, label: "Expenses", desc: "Track business expenses" },
   { href: "/accounting/employees", icon: Users, label: "Employees", desc: "Payroll, advances & labour" },
   { href: "/accounting/production-jobs", icon: Wrench, label: "Production Jobs", desc: "Outsource work & materials per collection" },
+  { href: "/accounting/courier-payments", icon: Truck, label: "Courier Payments", desc: "Leopard COD remittances & LAAM payments" },
   { href: "/accounting/reports", icon: BarChart3, label: "Reports", desc: "Financial reports & ledger" },
 ];
 

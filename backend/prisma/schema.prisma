@@ -173,6 +173,7 @@ model Account {
   salaryRecords    SalaryRecord[]
   labourPayments   LabourPayment[]
   outsourceEntries OutsourceWorkEntry[]
+  courierPayments  CourierPayment[]
 }
 
 model AccountTransfer {
@@ -384,6 +385,21 @@ model ProductionJob {
   status      String               @default("active")
   createdAt   DateTime             @default(now())
   workEntries OutsourceWorkEntry[]
+}
+
+model CourierPayment {
+  id              Int      @id @default(autoincrement())
+  source          String   // "leopard" | "laam"
+  shopifyOrderNos String?  // comma-separated order numbers (Leopard only)
+  grossAmount     Float    @default(0)
+  serviceCharge   Float    @default(0)
+  netReceived     Float
+  paymentRef      String?  // reference number (LAAM) or Leopard remittance ref
+  account         Account  @relation(fields: [accountId], references: [id])
+  accountId       Int
+  paymentDate     DateTime @default(now())
+  notes           String?
+  createdAt       DateTime @default(now())
 }
 
 model OutsourceWorkEntry {
