@@ -8,8 +8,8 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
-import { isAdmin } from "@/lib/auth";
-import { Plus, Trash2, Loader2, CheckCircle, Wallet } from "lucide-react";
+import { isAdmin, isAccountant } from "@/lib/auth";
+import { Plus, Trash2, Loader2, CheckCircle, Wallet, Edit2 } from "lucide-react";
 
 interface Account { id: number; name: string; type: string; balance: number; }
 interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; }
@@ -25,6 +25,7 @@ const accountTypeIcon: Record<string, string> = { cash: "💵", bank: "🏦", wa
 
 export default function EmployeesPage() {
   const canDelete = isAdmin();
+  const canManageEmployees = isAdmin();
   const [tab, setTab] = useState<Tab>("employees");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -35,6 +36,8 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false);
 
   const [showEmpForm, setShowEmpForm] = useState(false);
+  const [editEmp, setEditEmp] = useState<Employee | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "" });
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [showSalaryForm, setShowSalaryForm] = useState(false);
   const [showLabourForm, setShowLabourForm] = useState(false);
@@ -92,6 +95,19 @@ export default function EmployeesPage() {
       showToast("Employee added", "success");
       setShowEmpForm(false);
       setEmpForm({ name: "", designation: "", phone: "", monthlySalary: "" });
+      load();
+    } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
+    finally { setSaving(false); }
+  };
+
+  const handleUpdateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editEmp || !editForm.name) { showToast("Name required", "error"); return; }
+    setSaving(true);
+    try {
+      await apiPut(`/accounting/employees/${editEmp.id}`, editForm);
+      showToast("Employee updated", "success");
+      setEditEmp(null);
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -205,7 +221,7 @@ export default function EmployeesPage() {
             <p className="text-sm text-muted-foreground">Payroll, advances and labour payments</p>
           </div>
           <div className="flex gap-2">
-            {tab === "employees" && <Button size="sm" onClick={() => setShowEmpForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Employee</Button>}
+            {tab === "employees" && canManageEmployees && <Button size="sm" onClick={() => setShowEmpForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Employee</Button>}
             {tab === "advances" && <Button size="sm" onClick={() => setShowAdvanceForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Record Advance</Button>}
             {tab === "salaries" && <Button size="sm" onClick={() => setShowSalaryForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Salary</Button>}
             {tab === "labour" && <Button size="sm" onClick={() => setShowLabourForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Record Labour</Button>}
@@ -232,7 +248,10 @@ export default function EmployeesPage() {
                         <p className="text-xs text-muted-foreground">{emp.designation || "No designation"}</p>
                         {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
                       </div>
-                      {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                      <div className="flex items-center gap-1">
+                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary) }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
+                        {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                      </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
                       <div>
@@ -415,6 +434,22 @@ export default function EmployeesPage() {
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setShowEmpForm(false)} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Add Employee"}</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Edit Employee */}
+      <Dialog open={!!editEmp} onClose={() => setEditEmp(null)} title="Edit Employee" description="Update employee details and salary">
+        <form onSubmit={handleUpdateEmployee} className="space-y-3">
+          <FormField label="Name" required><Input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder="Full name" /></FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Designation"><Input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} placeholder="e.g. Tailor, Cutter" /></FormField>
+            <FormField label="Phone"><Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone number" /></FormField>
+          </div>
+          <FormField label="Monthly Salary (Rs)"><Input type="number" value={editForm.monthlySalary} onChange={e => setEditForm({ ...editForm, monthlySalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
+          <div className="flex gap-3 justify-end pt-2">
+            <Button type="button" variant="outline" onClick={() => setEditEmp(null)} className="cursor-pointer">Cancel</Button>
+            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Update Employee"}</Button>
           </div>
         </form>
       </Dialog>

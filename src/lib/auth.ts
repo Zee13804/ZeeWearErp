@@ -40,6 +40,10 @@ export function isDev(): boolean {
   return getUserRole() === "dev";
 }
 
+export function isAccountant(): boolean {
+  return getUserRole() === "accountant";
+}
+
 export function isViewer(): boolean {
   return getUserRole() === "viewer";
 }

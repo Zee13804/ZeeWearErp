@@ -11,9 +11,9 @@ const adminAuth = [authenticate, authorize('admin')];
 const accAuth = [authenticate, authorizeAccounting];
 
 router.get('/', ...accAuth, getAccounts);
-router.post('/', ...accAuth, createAccount);
+router.post('/', ...adminAuth, createAccount);
 router.get('/:id/ledger', ...accAuth, getAccountLedger);
-router.put('/:id', ...accAuth, updateAccount);
+router.put('/:id', ...adminAuth, updateAccount);
 router.delete('/:id', ...adminAuth, deleteAccount);
 
 router.get('/transfers', ...accAuth, getTransfers);

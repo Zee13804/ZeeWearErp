@@ -12,8 +12,8 @@ const adminAuth = [authenticate, authorize('admin')];
 const accAuth = [authenticate, authorizeAccounting];
 
 router.get('/', ...accAuth, getEmployees);
-router.post('/', ...accAuth, createEmployee);
-router.put('/:id', ...accAuth, updateEmployee);
+router.post('/', ...adminAuth, createEmployee);
+router.put('/:id', ...adminAuth, updateEmployee);
 router.delete('/:id', ...adminAuth, deleteEmployee);
 
 router.get('/advances', ...accAuth, getAdvances);

@@ -61,6 +61,7 @@ function fmt(n: number) {
 
 export default function AccountsPage() {
   const canDelete = isAdmin();
+  const canManageAccounts = isAdmin();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -340,9 +341,9 @@ export default function AccountsPage() {
             <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)} className="gap-2 cursor-pointer">
               <ArrowLeftRight className="w-4 h-4" /> Transfer
             </Button>
-            <Button size="sm" onClick={openCreate} className="gap-2 cursor-pointer">
+            {canManageAccounts && <Button size="sm" onClick={openCreate} className="gap-2 cursor-pointer">
               <Plus className="w-4 h-4" /> Add Account
-            </Button>
+            </Button>}
           </div>
         </div>
 
@@ -384,7 +385,7 @@ export default function AccountsPage() {
                         </div>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(acc)} className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer" title="Edit"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                        {canManageAccounts && <button onClick={() => openEdit(acc)} className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer" title="Edit"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>}
                         {canDelete && <button onClick={() => setDeleteTarget(acc)} className="p-1.5 rounded-md hover:bg-red-50 transition-colors cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </div>
                     </div>

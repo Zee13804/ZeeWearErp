@@ -32,7 +32,7 @@ interface Purchase {
   totalAmount: number;
   billImage?: string;
   purchaseDate: string;
-  items: Array<{ description: string; quantity: number; unitPrice: number; totalPrice: number }>;
+  items: Array<{ description: string; quantity: number; unit: string; unitPrice: number; totalPrice: number }>;
 }
 
 interface SupplierPayment {
@@ -53,6 +53,7 @@ type Tab = "suppliers" | "purchases" | "payments";
 
 export default function SuppliersPage() {
   const canDelete = isAdmin();
+  const canManageSuppliers = isAdmin();
   const [tab, setTab] = useState<Tab>("suppliers");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -75,7 +76,7 @@ export default function SuppliersPage() {
   const [supplierForm, setSupplierForm] = useState({ name: "", company: "", phone: "", email: "", address: "" });
   const [purchaseForm, setPurchaseForm] = useState({
     supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "",
-    items: [{ description: "", quantity: "1", unitPrice: "", totalPrice: "" }],
+    items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }],
   });
   const [paymentForm, setPaymentForm] = useState({ supplierId: "", accountId: "", amount: "", note: "", paymentDate: "" });
 
@@ -135,7 +136,7 @@ export default function SuppliersPage() {
       });
       showToast("Purchase recorded", "success");
       setShowPurchaseForm(false);
-      setPurchaseForm({ supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", items: [{ description: "", quantity: "1", unitPrice: "", totalPrice: "" }] });
+      setPurchaseForm({ supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }] });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -211,7 +212,7 @@ export default function SuppliersPage() {
             <p className="text-sm text-muted-foreground">Manage supplier purchases and payments</p>
           </div>
           <div className="flex gap-2">
-            {tab === "suppliers" && <Button size="sm" onClick={() => setShowSupplierForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Supplier</Button>}
+            {tab === "suppliers" && canManageSuppliers && <Button size="sm" onClick={() => setShowSupplierForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Supplier</Button>}
             {tab === "purchases" && <Button size="sm" onClick={() => setShowPurchaseForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Purchase</Button>}
             {tab === "payments" && <Button size="sm" onClick={() => setShowPaymentForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Record Payment</Button>}
           </div>
@@ -297,10 +298,10 @@ export default function SuppliersPage() {
                     <div className="border-t border-border bg-muted/20 px-4 py-3">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Items</p>
                       <table className="w-full text-xs">
-                        <thead><tr className="text-muted-foreground"><th className="text-left pb-1">Description</th><th className="text-right pb-1">Qty</th><th className="text-right pb-1">Unit</th><th className="text-right pb-1">Total</th></tr></thead>
+                        <thead><tr className="text-muted-foreground"><th className="text-left pb-1">Description</th><th className="text-right pb-1">Qty</th><th className="text-right pb-1">Unit</th><th className="text-right pb-1">Price</th><th className="text-right pb-1">Total</th></tr></thead>
                         <tbody className="divide-y divide-border/50">
                           {p.items.map((item, idx) => (
-                            <tr key={idx}><td className="py-1">{item.description}</td><td className="text-right py-1">{item.quantity}</td><td className="text-right py-1">Rs {fmt(item.unitPrice)}</td><td className="text-right py-1 font-medium">Rs {fmt(item.totalPrice)}</td></tr>
+                            <tr key={idx}><td className="py-1">{item.description}</td><td className="text-right py-1">{item.quantity}</td><td className="text-right py-1">{item.unit || "pcs"}</td><td className="text-right py-1">Rs {fmt(item.unitPrice)}</td><td className="text-right py-1 font-medium">Rs {fmt(item.totalPrice)}</td></tr>
                           ))}
                         </tbody>
                       </table>
@@ -378,16 +379,21 @@ export default function SuppliersPage() {
             <p className="text-sm font-medium">Items</p>
             {purchaseForm.items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-5"><Input value={item.description} onChange={e => updatePurchaseItem(idx, "description", e.target.value)} placeholder="Description" /></div>
+                <div className="col-span-4"><Input value={item.description} onChange={e => updatePurchaseItem(idx, "description", e.target.value)} placeholder="Description" /></div>
                 <div className="col-span-2"><Input type="number" value={item.quantity} onChange={e => updatePurchaseItem(idx, "quantity", e.target.value)} placeholder="Qty" min="0.01" step="any" /></div>
+                <div className="col-span-2">
+                  <select value={item.unit} onChange={e => updatePurchaseItem(idx, "unit", e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer">
+                    {["pcs","meters","kg","yards","feet","sets","rolls","dozen"].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
                 <div className="col-span-2"><Input type="number" value={item.unitPrice} onChange={e => updatePurchaseItem(idx, "unitPrice", e.target.value)} placeholder="Price" min="0" step="any" /></div>
-                <div className="col-span-2"><Input type="number" value={item.totalPrice} readOnly placeholder="Total" /></div>
+                <div className="col-span-1"><Input type="number" value={item.totalPrice} readOnly placeholder="Total" /></div>
                 <div className="col-span-1">
                   {idx > 0 && <button type="button" onClick={() => { const items = purchaseForm.items.filter((_, i) => i !== idx); const total = items.reduce((s, i) => s + (parseFloat(i.totalPrice) || 0), 0); setPurchaseForm({ ...purchaseForm, items, totalAmount: String(total) }); }} className="cursor-pointer"><X className="w-4 h-4 text-red-500" /></button>}
                 </div>
               </div>
             ))}
-            <button type="button" onClick={() => setPurchaseForm({ ...purchaseForm, items: [...purchaseForm.items, { description: "", quantity: "1", unitPrice: "", totalPrice: "" }] })} className="text-xs text-primary hover:underline cursor-pointer">+ Add Item</button>
+            <button type="button" onClick={() => setPurchaseForm({ ...purchaseForm, items: [...purchaseForm.items, { description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }] })} className="text-xs text-primary hover:underline cursor-pointer">+ Add Item</button>
           </div>
           <FormField label="Total Amount" required>
             <Input type="number" value={purchaseForm.totalAmount} onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })} placeholder="0.00" min="0" step="0.01" />

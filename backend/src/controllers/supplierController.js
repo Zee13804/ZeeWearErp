@@ -134,6 +134,7 @@ const createPurchase = async (req, res) => {
           create: items.map(item => ({
             description: item.description,
             quantity: parseFloat(item.quantity) || 1,
+            unit: item.unit || 'pcs',
             unitPrice: parseFloat(item.unitPrice),
             totalPrice: parseFloat(item.totalPrice),
           })),

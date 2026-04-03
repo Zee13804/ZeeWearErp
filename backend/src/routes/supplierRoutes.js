@@ -14,8 +14,8 @@ const adminAuth = [authenticate, authorize('admin')];
 const accAuth = [authenticate, authorizeAccounting];
 
 router.get('/', ...accAuth, getSuppliers);
-router.post('/', ...accAuth, createSupplier);
-router.put('/:id', ...accAuth, updateSupplier);
+router.post('/', ...adminAuth, createSupplier);
+router.put('/:id', ...adminAuth, updateSupplier);
 router.delete('/:id', ...adminAuth, deleteSupplier);
 router.get('/:id/ledger', ...accAuth, getSupplierLedger);
 
