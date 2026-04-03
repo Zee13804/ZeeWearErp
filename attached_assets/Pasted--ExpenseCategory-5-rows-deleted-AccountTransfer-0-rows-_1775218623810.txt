@@ -1,0 +1,232 @@
+  ✓ ExpenseCategory: 5 rows deleted
+  ✓ AccountTransfer: 0 rows deleted
+  ✓ Account: 0 rows deleted
+
+  Resetting autoincrement sequences...
+
+✅ Accounting data reset complete!
+   Kept intact: Article, Variant, Fabric, Accessory, StockLedger, User, Image etc.
+
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com/backend# cd /www/wwwroot/zeewear.devoriatech.com
+git pull origin main
+pm2 restart all
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [all](ids: [ 0 ])
+[PM2] [zeewear](0) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ zeewear    │ default     │ N/A     │ fork    │ 320746   │ 0s     │ 970  │ online    │ 0%       │ 17.3mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴─────────────────┴──────────┴──────────┴──────────┴──────────┘
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# ^C
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# prisma db push
+prisma: command not found
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# cd /www/wwwroot/zeewear.devoriatech.com
+
+# latest code
+git pull origin main
+
+# DB update (MOST IMPORTANT)
+DATABASE_URL="file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db" \
+backend/node_modules/.bin/prisma db push --schema=backend/prisma/schema.prisma
+
+# restart app
+export PATH=/www/server/nodejs/v20.20.2/bin:$PATH
+pm2 restart all
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Environment variables loaded from .env
+Prisma schema loaded from backend/prisma/schema.prisma
+Datasource "db": SQLite database "dev.db" at "file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db"
+
+🚀  Your database is now in sync with your Prisma schema. Done in 38ms
+
+✔ Generated Prisma Client (v6.19.2) to ./backend/node_modules/@prisma/client in 238ms
+
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [all](ids: [ 0 ])
+[PM2] [zeewear](0) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ zeewear    │ default     │ N/A     │ fork    │ 321041   │ 0s     │ 971  │ online    │ 0%       │ 12.8mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴─────────────────┴──────────┴──────────┴──────────┴──────────┘
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# /www/server/nodejs/v20.20.2/bin/node backend/src/server.js
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# cd /www/wwwroot/zeewear.devoriatech.com
+npm install
+npm run build
+
+up to date, audited 219 packages in 2s
+
+44 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (1 moderate, 2 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> dashboard-app@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.2s
+  Running TypeScript  ...Failed to compile.
+
+./src/app/accounting/production-jobs/[id]/page.tsx:708:11
+Type error: Type '{ title: string; message: string; onConfirm: () => Promise<void>; onCancel: () => void; confirmLabel: string; variant: string; }' is not assignable to type 'IntrinsicAttributes & ConfirmDialogProps'.
+  Property 'onCancel' does not exist on type 'IntrinsicAttributes & ConfirmDialogProps'.
+
+  706 |           message={`Delete "${deleteEntry.label}"?`}
+  707 |           onConfirm={handleDeleteEntry}
+> 708 |           onCancel={() => setDeleteEntry(null)}
+      |           ^
+  709 |           confirmLabel="Delete"
+  710 |           variant="danger"
+  711 |         />
+Next.js build worker exited with code: 1 and signal: null
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# ^C
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# export PATH=/www/server/nodejs/v20.20.2/bin:$PATH
+cd /www/wwwroot/zeewear.devoriatech.com
+git pull origin main
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# export PATH=/www/server/nodejs/v20.20.2/bin:$PATH
+cd /www/wwwroot/zeewear.devoriatech.com
+
+# Latest code pull karein (TypeScript fix bhi aa jayegi)
+git pull origin main
+
+# Database schema update karein (nayi tables ke liye)
+DATABASE_URL="file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db" \
+backend/node_modules/.bin/prisma db push --schema=backend/prisma/schema.prisma
+
+# Dependencies install karein
+npm install
+cd backend && npm install && cd ..
+
+# Production build banayein (yahi .next folder banana hai)
+npm run build
+
+# App restart karein
+pm2 restart all
+remote: Enumerating objects: 254, done.
+remote: Counting objects: 100% (254/254), done.
+remote: Compressing objects: 100% (22/22), done.
+remote: Total 159 (delta 123), reused 159 (delta 123), pack-reused 0 (from 0)
+Receiving objects: 100% (159/159), 268.83 KiB | 7.68 MiB/s, done.
+Resolving deltas: 100% (123/123), completed with 46 local objects.
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+   95e83f3..5d781b3  main       -> origin/main
+Updating 95e83f3..5d781b3
+error: Your local changes to the following files would be overwritten by merge:
+        .next/build-manifest.json
+        .next/fallback-build-manifest.json
+        .next/server/app-paths-manifest.json
+        .next/server/app/_not-found/page_client-reference-manifest.js
+        .next/server/app/accessories/page.js.nft.json
+        .next/server/app/accessories/page_client-reference-manifest.js
+        .next/server/app/articles/[id]/page.js.nft.json
+        .next/server/app/articles/[id]/page_client-reference-manifest.js
+        .next/server/app/articles/page.js.nft.json
+        .next/server/app/articles/page_client-reference-manifest.js
+        .next/server/app/dashboard/page.js.nft.json
+        .next/server/app/dashboard/page_client-reference-manifest.js
+        .next/server/app/fabric/page.js.nft.json
+        .next/server/app/fabric/page_client-reference-manifest.js
+        .next/server/app/import/page_client-reference-manifest.js
+        .next/server/app/login/page.js.nft.json
+        .next/server/app/login/page_client-reference-manifest.js
+        .next/server/app/page_client-reference-manifest.js
+        .next/server/app/reports/page.js.nft.json
+        .next/server/app/reports/page_client-reference-manifest.js
+        .next/server/app/settings/page.js.nft.json
+        .next/server/app/settings/page_client-reference-manifest.js
+        .next/server/app/users/page.js.nft.json
+        .next/server/app/users/page_client-reference-manifest.js
+        .next/server/app/variants/page.js.nft.json
+        .next/server/app/variants/page_client-reference-manifest.js
+        .next/server/chunks/ssr/_e6339ddf._.js
+        .next/server/chunks/ssr/_e6339ddf._.js.map
+        .next/server/server-reference-manifest.js
+        .next/server/server-reference-manifest.json
+        .next/types/routes.d.ts
+        .next/types/validator.ts
+        package-lock.json
+Please commit your changes or stash them before you merge.
+Aborting
+Environment variables loaded from .env
+Prisma schema loaded from backend/prisma/schema.prisma
+Datasource "db": SQLite database "dev.db" at "file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db"
+
+The database is already in sync with the Prisma schema.
+
+✔ Generated Prisma Client (v6.19.2) to ./backend/node_modules/@prisma/client in 202ms
+
+
+up to date, audited 219 packages in 1s
+
+44 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (1 moderate, 2 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+added 7 packages, and audited 227 packages in 3s
+
+38 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (1 moderate, 6 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> dashboard-app@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.3s
+  Running TypeScript  ..Failed to compile.
+
+./src/app/accounting/production-jobs/[id]/page.tsx:708:11
+Type error: Type '{ title: string; message: string; onConfirm: () => Promise<void>; onCancel: () => void; confirmLabel: string; variant: string; }' is not assignable to type 'IntrinsicAttributes & ConfirmDialogProps'.
+  Property 'onCancel' does not exist on type 'IntrinsicAttributes & ConfirmDialogProps'.
+
+  706 |           message={`Delete "${deleteEntry.label}"?`}
+  707 |           onConfirm={handleDeleteEntry}
+> 708 |           onCancel={() => setDeleteEntry(null)}
+      |           ^
+  709 |           confirmLabel="Delete"
+  710 |           variant="danger"
+  711 |         />
+Next.js build worker exited with code: 1 and signal: null
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [all](ids: [ 0 ])
+[PM2] [zeewear](0) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ zeewear    │ default     │ N/A     │ fork    │ 322387   │ 0s     │ 972  │ online    │ 0%       │ 18.6mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴─────────────────┴──────────┴──────────┴──────────┴──────────┘
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com# 
