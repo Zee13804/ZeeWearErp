@@ -93,10 +93,11 @@ const deleteSupplier = async (req, res) => {
 
 const getPurchases = async (req, res) => {
   try {
-    const { supplierId, dateFrom, dateTo, search } = req.query;
+    const { supplierId, dateFrom, dateTo, search, collection } = req.query;
     const where = {};
     if (supplierId) where.supplierId = parseInt(supplierId);
     if (search) where.invoiceNo = { contains: search };
+    if (collection) where.collection = { contains: collection };
     if (dateFrom || dateTo) {
       where.purchaseDate = {};
       if (dateFrom) where.purchaseDate.gte = new Date(dateFrom);
@@ -119,7 +120,7 @@ const getPurchases = async (req, res) => {
 
 const createPurchase = async (req, res) => {
   try {
-    const { supplierId, invoiceNo, description, totalAmount, items, purchaseDate } = req.body;
+    const { supplierId, invoiceNo, description, totalAmount, items, purchaseDate, collection } = req.body;
     if (!supplierId || !totalAmount)
       return res.status(400).json({ error: 'supplierId and totalAmount are required' });
 
@@ -129,6 +130,7 @@ const createPurchase = async (req, res) => {
         invoiceNo: invoiceNo || null,
         description: description || null,
         totalAmount: parseFloat(totalAmount),
+        collection: collection ? collection.trim() : null,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
         items: items?.length ? {
           create: items.map(item => ({

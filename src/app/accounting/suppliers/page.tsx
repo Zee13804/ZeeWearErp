@@ -31,6 +31,7 @@ interface Purchase {
   description?: string;
   totalAmount: number;
   billImage?: string;
+  collection?: string;
   purchaseDate: string;
   items: Array<{ description: string; quantity: number; unit: string; unitPrice: number; totalPrice: number }>;
 }
@@ -75,7 +76,7 @@ export default function SuppliersPage() {
 
   const [supplierForm, setSupplierForm] = useState({ name: "", company: "", phone: "", email: "", address: "" });
   const [purchaseForm, setPurchaseForm] = useState({
-    supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "",
+    supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", collection: "",
     items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }],
   });
   const [paymentForm, setPaymentForm] = useState({ supplierId: "", accountId: "", amount: "", note: "", paymentDate: "" });
@@ -136,7 +137,7 @@ export default function SuppliersPage() {
       });
       showToast("Purchase recorded", "success");
       setShowPurchaseForm(false);
-      setPurchaseForm({ supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }] });
+      setPurchaseForm({ supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", collection: "", items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }] });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -282,7 +283,12 @@ export default function SuppliersPage() {
                       </button>
                       <div>
                         <p className="font-medium">{p.supplier.name} {p.invoiceNo && <span className="text-muted-foreground text-xs">#{p.invoiceNo}</span>}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(p.purchaseDate).toLocaleDateString()}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground">{new Date(p.purchaseDate).toLocaleDateString()}</p>
+                          {p.collection && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium">{p.collection}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -372,9 +378,14 @@ export default function SuppliersPage() {
           <FormField label="Purchase Date">
             <Input type="date" value={purchaseForm.purchaseDate} onChange={e => setPurchaseForm({ ...purchaseForm, purchaseDate: e.target.value })} />
           </FormField>
-          <FormField label="Description">
-            <Input value={purchaseForm.description} onChange={e => setPurchaseForm({ ...purchaseForm, description: e.target.value })} placeholder="General description" />
-          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Description">
+              <Input value={purchaseForm.description} onChange={e => setPurchaseForm({ ...purchaseForm, description: e.target.value })} placeholder="General description" />
+            </FormField>
+            <FormField label="Collection (optional)">
+              <Input value={purchaseForm.collection} onChange={e => setPurchaseForm({ ...purchaseForm, collection: e.target.value })} placeholder="e.g. Summer Lawn 2025" />
+            </FormField>
+          </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Items</p>
             {purchaseForm.items.map((item, idx) => (

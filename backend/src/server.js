@@ -28,6 +28,7 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const accountingReportRoutes = require("./routes/accountingReportRoutes");
+const productionJobRoutes = require("./routes/productionJobRoutes");
 
 const { authenticate, authenticateAndEnforceReadOnly } = require("./middleware/authMiddleware");
 
@@ -65,6 +66,7 @@ app.use("/accounting/invoices", invoiceRoutes);
 app.use("/accounting/expenses", expenseRoutes);
 app.use("/accounting/employees", employeeRoutes);
 app.use("/accounting/reports", accountingReportRoutes);
+app.use("/accounting/production-jobs", productionJobRoutes);
 
 const { PrismaClient } = require('@prisma/client');
 (async () => {
