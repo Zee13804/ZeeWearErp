@@ -1,7 +1,7 @@
 /**
  * reset-accounting.js
  * 
- * SAFE RESET: Deletes all accounting-related data from the VPS database.
+ * SAFE RESET: Deletes all accounting-related data using raw SQL.
  * KEEPS: Article, Variant, Fabric, FabricLedger, Accessory, AccessoryLedger,
  *        StockLedger, Image, User, ActivityLog, Purpose, RolePermission
  *
@@ -11,112 +11,59 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+const tables = [
+  'OutsourceVendorPayment',
+  'OutsourceWorkEntry',
+  'ProductionJob',
+  'InvoicePayment',
+  'InvoiceItem',
+  'Invoice',
+  'Customer',
+  'SupplierPayment',
+  'SupplierPurchaseItem',
+  'SupplierPurchase',
+  'Supplier',
+  'SalaryRecord',
+  'Advance',
+  'Employee',
+  'LabourPayment',
+  'CourierPayment',
+  'Expense',
+  'ExpenseCategory',
+  'AccountTransfer',
+  'Account',
+];
+
 async function main() {
   console.log('🧹 Starting accounting data reset...\n');
 
-  // Delete in dependency order (children before parents)
+  // Disable FK checks temporarily for SQLite
+  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
 
-  console.log('  Deleting OutsourceVendorPayment...');
-  const vp = await prisma.outsourceVendorPayment.deleteMany({});
-  console.log(`    → ${vp.count} records deleted`);
+  for (const table of tables) {
+    try {
+      const result = await prisma.$executeRawUnsafe(`DELETE FROM "${table}"`);
+      console.log(`  ✓ ${table}: ${result} rows deleted`);
+    } catch (e) {
+      console.log(`  ⚠ ${table}: skipped (${e.message})`);
+    }
+  }
 
-  console.log('  Deleting OutsourceWorkEntry...');
-  const we = await prisma.outsourceWorkEntry.deleteMany({});
-  console.log(`    → ${we.count} records deleted`);
-
-  console.log('  Deleting ProductionJob...');
-  const pj = await prisma.productionJob.deleteMany({});
-  console.log(`    → ${pj.count} records deleted`);
-
-  console.log('  Deleting InvoicePayment...');
-  const ip = await prisma.invoicePayment.deleteMany({});
-  console.log(`    → ${ip.count} records deleted`);
-
-  console.log('  Deleting InvoiceItem...');
-  const ii = await prisma.invoiceItem.deleteMany({});
-  console.log(`    → ${ii.count} records deleted`);
-
-  console.log('  Deleting Invoice...');
-  const inv = await prisma.invoice.deleteMany({});
-  console.log(`    → ${inv.count} records deleted`);
-
-  console.log('  Deleting Customer...');
-  const cust = await prisma.customer.deleteMany({});
-  console.log(`    → ${cust.count} records deleted`);
-
-  console.log('  Deleting SupplierPayment...');
-  const sp = await prisma.supplierPayment.deleteMany({});
-  console.log(`    → ${sp.count} records deleted`);
-
-  console.log('  Deleting SupplierPurchaseItem...');
-  const spi = await prisma.supplierPurchaseItem.deleteMany({});
-  console.log(`    → ${spi.count} records deleted`);
-
-  console.log('  Deleting SupplierPurchase...');
-  const spur = await prisma.supplierPurchase.deleteMany({});
-  console.log(`    → ${spur.count} records deleted`);
-
-  console.log('  Deleting Supplier...');
-  const sup = await prisma.supplier.deleteMany({});
-  console.log(`    → ${sup.count} records deleted`);
-
-  console.log('  Deleting SalaryRecord...');
-  const sr = await prisma.salaryRecord.deleteMany({});
-  console.log(`    → ${sr.count} records deleted`);
-
-  console.log('  Deleting Advance...');
-  const adv = await prisma.advance.deleteMany({});
-  console.log(`    → ${adv.count} records deleted`);
-
-  console.log('  Deleting Employee...');
-  const emp = await prisma.employee.deleteMany({});
-  console.log(`    → ${emp.count} records deleted`);
-
-  console.log('  Deleting LabourPayment...');
-  const lp = await prisma.labourPayment.deleteMany({});
-  console.log(`    → ${lp.count} records deleted`);
-
-  console.log('  Deleting CourierPayment...');
-  const cp = await prisma.courierPayment.deleteMany({});
-  console.log(`    → ${cp.count} records deleted`);
-
-  console.log('  Deleting Expense...');
-  const exp = await prisma.expense.deleteMany({});
-  console.log(`    → ${exp.count} records deleted`);
-
-  console.log('  Deleting ExpenseCategory...');
-  const ec = await prisma.expenseCategory.deleteMany({});
-  console.log(`    → ${ec.count} records deleted`);
-
-  console.log('  Deleting AccountTransfer...');
-  const at = await prisma.accountTransfer.deleteMany({});
-  console.log(`    → ${at.count} records deleted`);
-
-  console.log('  Deleting Account...');
-  const acc = await prisma.account.deleteMany({});
-  console.log(`    → ${acc.count} records deleted`);
-
-  // Reset SQLite autoincrement sequences for accounting tables
-  const tables = [
-    'OutsourceVendorPayment', 'OutsourceWorkEntry', 'ProductionJob',
-    'InvoicePayment', 'InvoiceItem', 'Invoice', 'Customer',
-    'SupplierPayment', 'SupplierPurchaseItem', 'SupplierPurchase', 'Supplier',
-    'SalaryRecord', 'Advance', 'Employee', 'LabourPayment', 'CourierPayment',
-    'Expense', 'ExpenseCategory', 'AccountTransfer', 'Account',
-  ];
-
+  // Reset autoincrement sequences
   console.log('\n  Resetting autoincrement sequences...');
-  for (const t of tables) {
+  for (const table of tables) {
     try {
       await prisma.$executeRawUnsafe(
-        `DELETE FROM sqlite_sequence WHERE name = '${t}'`
+        `DELETE FROM sqlite_sequence WHERE name = '${table}'`
       );
-    } catch (_) { /* table may not be in sequence yet */ }
+    } catch (_) {}
   }
-  console.log('    → Done');
+
+  // Re-enable FK checks
+  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
 
   console.log('\n✅ Accounting data reset complete!');
-  console.log('   Kept intact: Article, Variant, Fabric, Accessory, StockLedger, User, Image, etc.\n');
+  console.log('   Kept intact: Article, Variant, Fabric, Accessory, StockLedger, User, Image etc.\n');
 }
 
 main()
