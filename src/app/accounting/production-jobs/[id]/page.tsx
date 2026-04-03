@@ -11,7 +11,8 @@ import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { isAdmin } from "@/lib/auth";
 import {
-  Plus, Trash2, Loader2, ArrowLeft, Package, Wrench, ShoppingCart, Calculator
+  Plus, Trash2, Loader2, ArrowLeft, Wrench, ShoppingCart, Calculator,
+  Wallet, TrendingDown, CheckCircle, Clock
 } from "lucide-react";
 
 interface WorkEntry {
@@ -23,7 +24,25 @@ interface WorkEntry {
   totalCost: number;
   workDate: string;
   notes?: string;
+}
+
+interface VendorPayment {
+  id: number;
+  vendorName: string;
+  amount: number;
+  type: string;
+  paymentDate: string;
+  notes?: string;
   account: { id: number; name: string };
+}
+
+interface VendorSummary {
+  vendorName: string;
+  totalWork: number;
+  totalPaid: number;
+  totalAdvance: number;
+  totalReceived: number;
+  balance: number;
 }
 
 interface SupplierPurchase {
@@ -43,10 +62,14 @@ interface JobDetail {
   status: string;
   createdAt: string;
   workEntries: WorkEntry[];
+  vendorPayments: VendorPayment[];
+  vendorSummary: VendorSummary[];
   linkedPurchases: SupplierPurchase[];
   totalOutsourceCost: number;
   totalMaterialCost: number;
   grandTotal: number;
+  totalVendorPaid: number;
+  vendorBalance: number;
 }
 
 interface Account { id: number; name: string; }
@@ -70,18 +93,35 @@ export default function JobDetailPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Work entry form
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [deleteEntry, setDeleteEntry] = useState<{ id: number; label: string } | null>(null);
+
+  // Vendor payment form
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [deletePayment, setDeletePayment] = useState<{ id: number; label: string } | null>(null);
+
+  // Expanded purchases
   const [expandedPurchase, setExpandedPurchase] = useState<number | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
+
   const [entryForm, setEntryForm] = useState({
     workType: "Cutting",
     vendorName: "",
     quantity: "",
     ratePerPiece: "",
-    accountId: "",
     workDate: today,
+    notes: "",
+  });
+
+  const [paymentForm, setPaymentForm] = useState({
+    vendorName: "",
+    amount: "",
+    type: "payment",
+    accountId: "",
+    paymentDate: today,
     notes: "",
   });
 
@@ -108,7 +148,6 @@ export default function JobDetailPage() {
 
   const handleAddEntry = async () => {
     if (!entryForm.vendorName.trim()) { showToast("Vendor name is required", "error"); return; }
-    if (!entryForm.accountId) { showToast("Please select an account", "error"); return; }
     setSaving(true);
     try {
       await apiPost(`/accounting/production-jobs/${id}/entries`, {
@@ -117,7 +156,7 @@ export default function JobDetailPage() {
       });
       showToast("Work entry added", "success");
       setShowEntryForm(false);
-      setEntryForm({ workType: "Cutting", vendorName: "", quantity: "", ratePerPiece: "", accountId: "", workDate: today, notes: "" });
+      setEntryForm({ workType: "Cutting", vendorName: "", quantity: "", ratePerPiece: "", workDate: today, notes: "" });
       load();
     } catch (e: any) {
       showToast(e.message || "Failed to add entry", "error");
@@ -138,6 +177,41 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleAddPayment = async () => {
+    if (!paymentForm.vendorName.trim()) { showToast("Vendor name is required", "error"); return; }
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) { showToast("Enter a valid amount", "error"); return; }
+    if (!paymentForm.accountId) { showToast("Please select an account", "error"); return; }
+    setSaving(true);
+    try {
+      await apiPost(`/accounting/production-jobs/${id}/vendor-payments`, paymentForm);
+      showToast("Payment recorded", "success");
+      setShowPaymentForm(false);
+      setPaymentForm({ vendorName: "", amount: "", type: "payment", accountId: "", paymentDate: today, notes: "" });
+      load();
+    } catch (e: any) {
+      showToast(e.message || "Failed to record payment", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePayment = async () => {
+    if (!deletePayment) return;
+    try {
+      await apiDelete(`/accounting/production-jobs/vendor-payments/${deletePayment.id}`);
+      showToast("Payment deleted", "success");
+      setDeletePayment(null);
+      load();
+    } catch (e: any) {
+      showToast(e.message || "Failed to delete payment", "error");
+    }
+  };
+
+  const openPaymentFor = (vendorName: string) => {
+    setPaymentForm(f => ({ ...f, vendorName }));
+    setShowPaymentForm(true);
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -156,9 +230,12 @@ export default function JobDetailPage() {
     );
   }
 
+  const vendorNames = Array.from(new Set(job.workEntries.map(e => e.vendorName)));
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-start gap-3">
           <button
             onClick={() => router.push("/accounting/production-jobs")}
@@ -186,28 +263,143 @@ export default function JobDetailPage() {
           <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
             <Calculator className="w-4 h-4 text-primary" /> Cost Sheet
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-4">
-              <p className="text-xs text-orange-700 dark:text-orange-400 font-medium">Outsource Work Cost</p>
-              <p className="text-xl font-bold text-orange-700 dark:text-orange-400 mt-1">
+              <p className="text-xs text-orange-700 dark:text-orange-400 font-medium">Outsource Work</p>
+              <p className="text-lg font-bold text-orange-700 dark:text-orange-400 mt-1">
                 Rs {fmt(job.totalOutsourceCost)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{job.workEntries.length} work entries</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{job.workEntries.length} entries</p>
             </div>
             <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
               <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Material Purchases</p>
-              <p className="text-xl font-bold text-blue-700 dark:text-blue-400 mt-1">
+              <p className="text-lg font-bold text-blue-700 dark:text-blue-400 mt-1">
                 Rs {fmt(job.totalMaterialCost)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{job.linkedPurchases.length} supplier purchases</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{job.linkedPurchases.length} purchases</p>
             </div>
-            <div className="rounded-lg bg-foreground/5 border-2 border-primary/30 p-4">
-              <p className="text-xs text-foreground font-medium">Grand Total</p>
-              <p className="text-xl font-bold text-primary mt-1">Rs {fmt(job.grandTotal)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total production cost</p>
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
+              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Vendor Paid</p>
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+                Rs {fmt(job.totalVendorPaid)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{job.vendorPayments.length} payments</p>
+            </div>
+            <div className={`rounded-lg border-2 p-4 ${
+              job.vendorBalance <= 0
+                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
+                : "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700"
+            }`}>
+              <p className={`text-xs font-medium ${job.vendorBalance <= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>
+                Vendor Balance Due
+              </p>
+              <p className={`text-lg font-bold mt-1 ${job.vendorBalance <= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>
+                Rs {fmt(Math.abs(job.vendorBalance))}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {job.vendorBalance <= 0 ? "Fully paid" : "Still owed"}
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Vendor Payment Ledger */}
+        {job.vendorSummary.length > 0 && (
+          <div className="bg-background rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-emerald-600" /> Vendor Payment Ledger
+              </h2>
+              <Button size="sm" onClick={() => setShowPaymentForm(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Record Payment
+              </Button>
+            </div>
+
+            {/* Per-vendor balance table */}
+            <div className="overflow-x-auto mb-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-xs text-muted-foreground font-medium">Vendor</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Work Total</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Advance</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Paid</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Balance</th>
+                    <th className="py-2 px-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {job.vendorSummary.map(v => (
+                    <tr key={v.vendorName} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2.5 px-3 font-medium text-foreground">{v.vendorName}</td>
+                      <td className="py-2.5 px-3 text-right text-orange-600 font-semibold">Rs {fmt(v.totalWork)}</td>
+                      <td className="py-2.5 px-3 text-right text-blue-600">
+                        {v.totalAdvance > 0 ? `Rs ${fmt(v.totalAdvance)}` : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-emerald-600">
+                        {v.totalPaid > 0 ? `Rs ${fmt(v.totalPaid)}` : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className={`font-bold ${v.balance <= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          {v.balance <= 0
+                            ? <span className="flex items-center justify-end gap-1"><CheckCircle className="w-3 h-3" /> Cleared</span>
+                            : `Rs ${fmt(v.balance)}`
+                          }
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {v.balance > 0 && (
+                          <Button size="sm" variant="outline" onClick={() => openPaymentFor(v.vendorName)}>
+                            Pay
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Payment history */}
+            {job.vendorPayments.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-2">Payment History</p>
+                <div className="space-y-1.5">
+                  {job.vendorPayments.map(p => (
+                    <div key={p.id} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          p.type === "advance"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        }`}>
+                          {p.type === "advance" ? "Advance" : "Payment"}
+                        </span>
+                        <span className="text-sm font-medium text-foreground truncate">{p.vendorName}</span>
+                        <span className="text-xs text-muted-foreground">{p.account.name}</span>
+                        {p.notes && <span className="text-xs text-muted-foreground truncate">— {p.notes}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="font-semibold text-emerald-600">Rs {fmt(p.amount)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(p.paymentDate).toLocaleDateString("en-PK")}
+                        </span>
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeletePayment({ id: p.id, label: `${p.type} Rs ${fmt(p.amount)} to ${p.vendorName}` })}
+                            className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Outsource Work Entries */}
         <div className="bg-background rounded-xl border border-border p-5">
@@ -215,9 +407,16 @@ export default function JobDetailPage() {
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Wrench className="w-4 h-4 text-orange-600" /> Outsource Work Entries
             </h2>
-            <Button size="sm" onClick={() => setShowEntryForm(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Add Entry
-            </Button>
+            <div className="flex gap-2">
+              {job.vendorSummary.some(v => v.balance > 0) && (
+                <Button size="sm" variant="outline" onClick={() => setShowPaymentForm(true)}>
+                  <Wallet className="w-4 h-4 mr-1" /> Record Payment
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setShowEntryForm(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Entry
+              </Button>
+            </div>
           </div>
 
           {job.workEntries.length === 0 ? (
@@ -235,7 +434,6 @@ export default function JobDetailPage() {
                     <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Qty</th>
                     <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Rate/pc</th>
                     <th className="text-right py-2 px-3 text-xs text-muted-foreground font-medium">Total</th>
-                    <th className="text-left py-2 px-3 text-xs text-muted-foreground font-medium">Account</th>
                     <th className="text-left py-2 px-3 text-xs text-muted-foreground font-medium">Date</th>
                     {canDelete && <th className="py-2 px-3"></th>}
                   </tr>
@@ -252,7 +450,6 @@ export default function JobDetailPage() {
                       <td className="py-2.5 px-3 text-right text-muted-foreground">{fmt(entry.quantity)}</td>
                       <td className="py-2.5 px-3 text-right text-muted-foreground">Rs {fmt(entry.ratePerPiece)}</td>
                       <td className="py-2.5 px-3 text-right font-semibold text-foreground">Rs {fmt(entry.totalCost)}</td>
-                      <td className="py-2.5 px-3 text-muted-foreground text-xs">{entry.account.name}</td>
                       <td className="py-2.5 px-3 text-muted-foreground text-xs">
                         {new Date(entry.workDate).toLocaleDateString("en-PK")}
                       </td>
@@ -275,7 +472,7 @@ export default function JobDetailPage() {
                     <td className="py-2.5 px-3 text-right font-bold text-orange-600">
                       Rs {fmt(job.totalOutsourceCost)}
                     </td>
-                    <td colSpan={canDelete ? 3 : 2}></td>
+                    <td colSpan={canDelete ? 2 : 1}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -289,10 +486,7 @@ export default function JobDetailPage() {
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-blue-600" /> Material Purchases for "{job.collection}"
             </h2>
-            <a
-              href="/accounting/suppliers"
-              className="text-xs text-primary hover:underline"
-            >
+            <a href="/accounting/suppliers" className="text-xs text-primary hover:underline">
               Add purchase in Suppliers →
             </a>
           </div>
@@ -367,84 +561,162 @@ export default function JobDetailPage() {
 
       {/* Add Work Entry Modal */}
       <Dialog open={showEntryForm} title="Add Outsource Work Entry" onClose={() => setShowEntryForm(false)}>
-          <div className="space-y-4">
-            <FormField label="Work Type *">
-              <Select
-                value={entryForm.workType}
-                onChange={val => setEntryForm(f => ({ ...f, workType: val }))}
-                options={WORK_TYPES.map(t => ({ label: t, value: t }))}
-              />
-            </FormField>
-            <FormField label="Vendor / Tailor Name *">
+        <div className="space-y-4">
+          <FormField label="Work Type *">
+            <Select
+              value={entryForm.workType}
+              onChange={val => setEntryForm(f => ({ ...f, workType: val }))}
+              options={WORK_TYPES.map(t => ({ label: t, value: t }))}
+            />
+          </FormField>
+          <FormField label="Vendor / Tailor Name *">
+            <Input
+              value={entryForm.vendorName}
+              onChange={e => setEntryForm(f => ({ ...f, vendorName: e.target.value }))}
+              placeholder="e.g. Ahmad Tailor, Raza Embroidery"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Quantity (pieces)">
               <Input
-                value={entryForm.vendorName}
-                onChange={e => setEntryForm(f => ({ ...f, vendorName: e.target.value }))}
-                placeholder="e.g. Ahmad Tailor, Raza Embroidery"
+                type="number"
+                min="0"
+                value={entryForm.quantity}
+                onChange={e => setEntryForm(f => ({ ...f, quantity: e.target.value }))}
+                placeholder="0"
               />
             </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Quantity (pieces)">
-                <Input
-                  type="number"
-                  min="0"
-                  value={entryForm.quantity}
-                  onChange={e => setEntryForm(f => ({ ...f, quantity: e.target.value }))}
-                  placeholder="0"
-                />
-              </FormField>
-              <FormField label="Rate per Piece (Rs)">
-                <Input
-                  type="number"
-                  min="0"
-                  value={entryForm.ratePerPiece}
-                  onChange={e => setEntryForm(f => ({ ...f, ratePerPiece: e.target.value }))}
-                  placeholder="0"
-                />
-              </FormField>
-            </div>
-            {totalCost > 0 && (
-              <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-3 text-center">
-                <p className="text-xs text-orange-700 dark:text-orange-400">Total Cost</p>
-                <p className="text-lg font-bold text-orange-700 dark:text-orange-400">Rs {fmt(totalCost)}</p>
-              </div>
-            )}
-            <FormField label="Pay from Account *">
-              <Select
-                value={entryForm.accountId}
-                onChange={val => setEntryForm(f => ({ ...f, accountId: val }))}
-                options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]}
-              />
-            </FormField>
-            <FormField label="Date">
+            <FormField label="Rate per Piece (Rs)">
               <Input
-                type="date"
-                value={entryForm.workDate}
-                onChange={e => setEntryForm(f => ({ ...f, workDate: e.target.value }))}
+                type="number"
+                min="0"
+                value={entryForm.ratePerPiece}
+                onChange={e => setEntryForm(f => ({ ...f, ratePerPiece: e.target.value }))}
+                placeholder="0"
               />
             </FormField>
-            <FormField label="Notes">
-              <Input
-                value={entryForm.notes}
-                onChange={e => setEntryForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder="Optional notes"
-              />
-            </FormField>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowEntryForm(false)}>Cancel</Button>
-              <Button onClick={handleAddEntry} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                Add Entry
-              </Button>
-            </div>
           </div>
+          {totalCost > 0 && (
+            <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-3 text-center">
+              <p className="text-xs text-orange-700 dark:text-orange-400">Total Cost</p>
+              <p className="text-lg font-bold text-orange-700 dark:text-orange-400">Rs {fmt(totalCost)}</p>
+            </div>
+          )}
+          <FormField label="Date">
+            <Input
+              type="date"
+              value={entryForm.workDate}
+              onChange={e => setEntryForm(f => ({ ...f, workDate: e.target.value }))}
+            />
+          </FormField>
+          <FormField label="Notes">
+            <Input
+              value={entryForm.notes}
+              onChange={e => setEntryForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Optional notes"
+            />
+          </FormField>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowEntryForm(false)}>Cancel</Button>
+            <Button onClick={handleAddEntry} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Add Entry
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Vendor Payment Modal */}
+      <Dialog open={showPaymentForm} title="Record Vendor Payment" onClose={() => setShowPaymentForm(false)}>
+        <div className="space-y-4">
+          <FormField label="Vendor Name *">
+            <Select
+              value={paymentForm.vendorName}
+              onChange={val => setPaymentForm(f => ({ ...f, vendorName: val }))}
+              options={[
+                { label: "Select vendor", value: "" },
+                ...vendorNames.map(n => ({ label: n, value: n })),
+                { label: "Other / New vendor", value: "__other__" },
+              ]}
+            />
+            {paymentForm.vendorName === "__other__" && (
+              <Input
+                className="mt-2"
+                placeholder="Enter vendor name"
+                onChange={e => setPaymentForm(f => ({ ...f, vendorName: e.target.value }))}
+              />
+            )}
+          </FormField>
+          <FormField label="Payment Type">
+            <Select
+              value={paymentForm.type}
+              onChange={val => setPaymentForm(f => ({ ...f, type: val }))}
+              options={[
+                { label: "Payment (against work done)", value: "payment" },
+                { label: "Advance (before work)", value: "advance" },
+              ]}
+            />
+          </FormField>
+          <FormField label="Amount (Rs) *">
+            <Input
+              type="number"
+              min="0"
+              value={paymentForm.amount}
+              onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+              placeholder="0"
+            />
+          </FormField>
+          <FormField label="Pay from Account *">
+            <Select
+              value={paymentForm.accountId}
+              onChange={val => setPaymentForm(f => ({ ...f, accountId: val }))}
+              options={[
+                { label: "Select account", value: "" },
+                ...accounts.map(a => ({ label: a.name, value: String(a.id) })),
+              ]}
+            />
+          </FormField>
+          <FormField label="Date">
+            <Input
+              type="date"
+              value={paymentForm.paymentDate}
+              onChange={e => setPaymentForm(f => ({ ...f, paymentDate: e.target.value }))}
+            />
+          </FormField>
+          <FormField label="Notes">
+            <Input
+              value={paymentForm.notes}
+              onChange={e => setPaymentForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Optional notes"
+            />
+          </FormField>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowPaymentForm(false)}>Cancel</Button>
+            <Button onClick={handleAddPayment} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Record Payment
+            </Button>
+          </div>
+        </div>
       </Dialog>
 
       {deleteEntry && (
         <ConfirmDialog
           title="Delete Work Entry"
-          message={`Delete "${deleteEntry.label}"? This will credit the account back.`}
+          message={`Delete "${deleteEntry.label}"?`}
           onConfirm={handleDeleteEntry}
           onCancel={() => setDeleteEntry(null)}
+          confirmLabel="Delete"
+          variant="danger"
+        />
+      )}
+
+      {deletePayment && (
+        <ConfirmDialog
+          title="Delete Payment"
+          message={`Delete ${deletePayment.label}? This will credit the account back.`}
+          onConfirm={handleDeletePayment}
+          onCancel={() => setDeletePayment(null)}
           confirmLabel="Delete"
           variant="danger"
         />

@@ -4,6 +4,7 @@ const { authenticate, authorize, authorizeAccounting } = require('../middleware/
 const {
   getJobs, getJob, createJob, updateJob, deleteJob,
   getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
+  getVendorPayments, createVendorPayment, deleteVendorPayment,
   getCollections,
 } = require('../controllers/productionJobController');
 
@@ -22,5 +23,9 @@ router.get('/:jobId/entries', ...accAuth, getWorkEntries);
 router.post('/:jobId/entries', ...accAuth, createWorkEntry);
 router.put('/entries/:id', ...accAuth, updateWorkEntry);
 router.delete('/entries/:id', ...adminAuth, deleteWorkEntry);
+
+router.get('/:jobId/vendor-payments', ...accAuth, getVendorPayments);
+router.post('/:jobId/vendor-payments', ...accAuth, createVendorPayment);
+router.delete('/vendor-payments/:id', ...adminAuth, deleteVendorPayment);
 
 module.exports = router;

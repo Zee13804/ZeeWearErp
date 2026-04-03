@@ -172,8 +172,8 @@ model Account {
   advances         Advance[]
   salaryRecords    SalaryRecord[]
   labourPayments   LabourPayment[]
-  outsourceEntries OutsourceWorkEntry[]
   courierPayments  CourierPayment[]
+  vendorPayments   OutsourceVendorPayment[]
 }
 
 model AccountTransfer {
@@ -379,12 +379,13 @@ model LabourPayment {
 // ============================================================
 
 model ProductionJob {
-  id          Int                  @id @default(autoincrement())
-  collection  String
-  description String?
-  status      String               @default("active")
-  createdAt   DateTime             @default(now())
-  workEntries OutsourceWorkEntry[]
+  id             Int                    @id @default(autoincrement())
+  collection     String
+  description    String?
+  status         String                 @default("active")
+  createdAt      DateTime               @default(now())
+  workEntries    OutsourceWorkEntry[]
+  vendorPayments OutsourceVendorPayment[]
 }
 
 model CourierPayment {
@@ -411,9 +412,21 @@ model OutsourceWorkEntry {
   quantity     Float         @default(0)
   ratePerPiece Float         @default(0)
   totalCost    Float
-  account      Account       @relation(fields: [accountId], references: [id])
-  accountId    Int
   workDate     DateTime      @default(now())
   notes        String?
   createdAt    DateTime      @default(now())
+}
+
+model OutsourceVendorPayment {
+  id          Int           @id @default(autoincrement())
+  job         ProductionJob @relation(fields: [jobId], references: [id])
+  jobId       Int
+  vendorName  String
+  amount      Float
+  type        String        @default("payment") // "payment" | "advance"
+  account     Account       @relation(fields: [accountId], references: [id])
+  accountId   Int
+  paymentDate DateTime      @default(now())
+  notes       String?
+  createdAt   DateTime      @default(now())
 }

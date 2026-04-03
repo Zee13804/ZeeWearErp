@@ -15,6 +15,7 @@ const getJobs = async (req, res) => {
         include: {
           _count: { select: { workEntries: true } },
           workEntries: { select: { totalCost: true } },
+          vendorPayments: { select: { amount: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -34,11 +35,14 @@ const getJobs = async (req, res) => {
     const enriched = jobs.map(job => {
       const totalOutsourceCost = job.workEntries.reduce((s, e) => s + e.totalCost, 0);
       const totalMaterialCost = materialByCollection[job.collection.toLowerCase().trim()] || 0;
+      const totalVendorPaid = job.vendorPayments.reduce((s, p) => s + p.amount, 0);
       return {
         ...job,
         totalOutsourceCost,
         totalMaterialCost,
         grandTotal: totalOutsourceCost + totalMaterialCost,
+        totalVendorPaid,
+        vendorBalance: totalOutsourceCost - totalVendorPaid,
       };
     });
 
@@ -58,10 +62,13 @@ const getJob = async (req, res) => {
         where: { id: jobId },
         include: {
           workEntries: {
+            orderBy: { workDate: 'desc' },
+          },
+          vendorPayments: {
             include: {
               account: { select: { id: true, name: true } },
             },
-            orderBy: { workDate: 'desc' },
+            orderBy: { paymentDate: 'desc' },
           },
         },
       }),
@@ -83,6 +90,33 @@ const getJob = async (req, res) => {
 
     const totalOutsourceCost = job.workEntries.reduce((s, e) => s + e.totalCost, 0);
     const totalMaterialCost = linkedPurchases.reduce((s, p) => s + p.totalAmount, 0);
+    const totalVendorPaid = job.vendorPayments.reduce((s, p) => s + p.amount, 0);
+
+    // Build per-vendor summary
+    const vendorMap = {};
+    for (const entry of job.workEntries) {
+      const key = entry.vendorName.toLowerCase().trim();
+      if (!vendorMap[key]) {
+        vendorMap[key] = { vendorName: entry.vendorName, totalWork: 0, totalPaid: 0, totalAdvance: 0 };
+      }
+      vendorMap[key].totalWork += entry.totalCost;
+    }
+    for (const payment of job.vendorPayments) {
+      const key = payment.vendorName.toLowerCase().trim();
+      if (!vendorMap[key]) {
+        vendorMap[key] = { vendorName: payment.vendorName, totalWork: 0, totalPaid: 0, totalAdvance: 0 };
+      }
+      if (payment.type === 'advance') {
+        vendorMap[key].totalAdvance += payment.amount;
+      } else {
+        vendorMap[key].totalPaid += payment.amount;
+      }
+    }
+    const vendorSummary = Object.values(vendorMap).map(v => ({
+      ...v,
+      totalReceived: v.totalPaid + v.totalAdvance,
+      balance: v.totalWork - (v.totalPaid + v.totalAdvance),
+    }));
 
     return res.json({
       job: {
@@ -90,7 +124,10 @@ const getJob = async (req, res) => {
         totalOutsourceCost,
         totalMaterialCost,
         grandTotal: totalOutsourceCost + totalMaterialCost,
+        totalVendorPaid,
+        vendorBalance: totalOutsourceCost - totalVendorPaid,
         linkedPurchases,
+        vendorSummary,
       },
     });
   } catch (err) {
@@ -145,6 +182,8 @@ const deleteJob = async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete job with work entries. Delete all entries first.' });
     }
 
+    // Also delete vendor payments
+    await prisma.outsourceVendorPayment.deleteMany({ where: { jobId } });
     await prisma.productionJob.delete({ where: { id: jobId } });
     return res.json({ message: 'Production job deleted' });
   } catch (err) {
@@ -159,9 +198,6 @@ const getWorkEntries = async (req, res) => {
     const { jobId } = req.params;
     const entries = await prisma.outsourceWorkEntry.findMany({
       where: { jobId: parseInt(jobId) },
-      include: {
-        account: { select: { id: true, name: true } },
-      },
       orderBy: { workDate: 'desc' },
     });
     return res.json({ entries });
@@ -173,10 +209,10 @@ const getWorkEntries = async (req, res) => {
 const createWorkEntry = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const { workType, vendorName, quantity, ratePerPiece, accountId, workDate, notes } = req.body;
+    const { workType, vendorName, quantity, ratePerPiece, workDate, notes } = req.body;
 
-    if (!workType || !vendorName || !accountId) {
-      return res.status(400).json({ error: 'workType, vendorName and accountId are required' });
+    if (!workType || !vendorName) {
+      return res.status(400).json({ error: 'workType and vendorName are required' });
     }
 
     const qty = parseFloat(quantity) || 0;
@@ -191,12 +227,8 @@ const createWorkEntry = async (req, res) => {
         quantity: qty,
         ratePerPiece: rate,
         totalCost,
-        accountId: parseInt(accountId),
         workDate: workDate ? new Date(workDate) : new Date(),
         notes: notes || null,
-      },
-      include: {
-        account: { select: { id: true, name: true } },
       },
     });
     return res.status(201).json({ message: 'Work entry added', entry });
@@ -208,7 +240,7 @@ const createWorkEntry = async (req, res) => {
 const updateWorkEntry = async (req, res) => {
   try {
     const { id } = req.params;
-    const { workType, vendorName, quantity, ratePerPiece, accountId, workDate, notes } = req.body;
+    const { workType, vendorName, quantity, ratePerPiece, workDate, notes } = req.body;
 
     const existing = await prisma.outsourceWorkEntry.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ error: 'Work entry not found' });
@@ -225,11 +257,9 @@ const updateWorkEntry = async (req, res) => {
         quantity: qty,
         ratePerPiece: rate,
         totalCost,
-        ...(accountId && { accountId: parseInt(accountId) }),
         ...(workDate && { workDate: new Date(workDate) }),
         ...(notes !== undefined && { notes: notes || null }),
       },
-      include: { account: { select: { id: true, name: true } } },
     });
     return res.json({ message: 'Work entry updated', entry });
   } catch (err) {
@@ -244,6 +274,68 @@ const deleteWorkEntry = async (req, res) => {
     return res.json({ message: 'Work entry deleted' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete work entry', details: err.message });
+  }
+};
+
+// ── Vendor Payments ──────────────────────────────────────
+
+const getVendorPayments = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const payments = await prisma.outsourceVendorPayment.findMany({
+      where: { jobId: parseInt(jobId) },
+      include: {
+        account: { select: { id: true, name: true } },
+      },
+      orderBy: { paymentDate: 'desc' },
+    });
+    return res.json({ payments });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch vendor payments', details: err.message });
+  }
+};
+
+const createVendorPayment = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { vendorName, amount, type, accountId, paymentDate, notes } = req.body;
+
+    if (!vendorName || !amount || !accountId) {
+      return res.status(400).json({ error: 'vendorName, amount, and accountId are required' });
+    }
+
+    const paymentAmount = parseFloat(amount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+
+    const payment = await prisma.outsourceVendorPayment.create({
+      data: {
+        jobId: parseInt(jobId),
+        vendorName: vendorName.trim(),
+        amount: paymentAmount,
+        type: type === 'advance' ? 'advance' : 'payment',
+        accountId: parseInt(accountId),
+        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+        notes: notes || null,
+      },
+      include: {
+        account: { select: { id: true, name: true } },
+      },
+    });
+    return res.status(201).json({ message: 'Vendor payment recorded', payment });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to record vendor payment', details: err.message });
+  }
+};
+
+const deleteVendorPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.outsourceVendorPayment.delete({ where: { id: parseInt(id) } });
+    return res.json({ message: 'Vendor payment deleted' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete vendor payment', details: err.message });
   }
 };
 
@@ -268,5 +360,6 @@ const getCollections = async (req, res) => {
 module.exports = {
   getJobs, getJob, createJob, updateJob, deleteJob,
   getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
+  getVendorPayments, createVendorPayment, deleteVendorPayment,
   getCollections,
 };
