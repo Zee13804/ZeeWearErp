@@ -366,16 +366,14 @@ export default function JobDetailPage() {
       </div>
 
       {/* Add Work Entry Modal */}
-      {showEntryForm && (
-        <Dialog title="Add Outsource Work Entry" onClose={() => setShowEntryForm(false)}>
+      <Dialog open={showEntryForm} title="Add Outsource Work Entry" onClose={() => setShowEntryForm(false)}>
           <div className="space-y-4">
             <FormField label="Work Type *">
               <Select
                 value={entryForm.workType}
-                onChange={e => setEntryForm(f => ({ ...f, workType: e.target.value }))}
-              >
-                {WORK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </Select>
+                onChange={val => setEntryForm(f => ({ ...f, workType: val }))}
+                options={WORK_TYPES.map(t => ({ label: t, value: t }))}
+              />
             </FormField>
             <FormField label="Vendor / Tailor Name *">
               <Input
@@ -413,11 +411,9 @@ export default function JobDetailPage() {
             <FormField label="Pay from Account *">
               <Select
                 value={entryForm.accountId}
-                onChange={e => setEntryForm(f => ({ ...f, accountId: e.target.value }))}
-              >
-                <option value="">Select account</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </Select>
+                onChange={val => setEntryForm(f => ({ ...f, accountId: val }))}
+                options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]}
+              />
             </FormField>
             <FormField label="Date">
               <Input
@@ -441,8 +437,7 @@ export default function JobDetailPage() {
               </Button>
             </div>
           </div>
-        </Dialog>
-      )}
+      </Dialog>
 
       {deleteEntry && (
         <ConfirmDialog

@@ -246,8 +246,7 @@ export default function ProductionJobsPage() {
         )}
       </div>
 
-      {showForm && (
-        <Dialog title="New Production Job" onClose={() => { setShowForm(false); setForm({ collection: "", description: "" }); }}>
+      <Dialog open={showForm} title="New Production Job" onClose={() => { setShowForm(false); setForm({ collection: "", description: "" }); }}>
           <div className="space-y-4">
             <FormField label="Collection Name *">
               <Input
@@ -275,8 +274,7 @@ export default function ProductionJobsPage() {
               </Button>
             </div>
           </div>
-        </Dialog>
-      )}
+      </Dialog>
 
       {deleteTarget && (
         <ConfirmDialog
