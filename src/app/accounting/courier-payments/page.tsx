@@ -416,7 +416,7 @@ export default function CourierPaymentsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Delete Payment"
-        description={`Delete "${deleteTarget?.label}"? This will reverse its effect on the account balance.`}
+        message={`Delete "${deleteTarget?.label}"? This will reverse its effect on the account balance.`}
         confirmLabel="Delete"
         loading={deleting}
       />
