@@ -350,6 +350,7 @@ interface PLData {
 }
 
 function PLReport({ data, onExport }: { data: PLData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const rows: [string, string][] = [
     ["Item", "Amount (Rs)"],
     ["Revenue (Payments Received)", String(data.revenue)],
@@ -401,6 +402,7 @@ interface LedgerData {
 }
 
 function LedgerReport({ data, onExport }: { data: LedgerData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.entries) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Date", "Type", "Category", "Account", "Description", "Amount"],
     ...data.entries.map(e => [new Date(e.date).toLocaleDateString(), e.type, e.category, e.account || "", e.description, e.amount]),
@@ -450,6 +452,7 @@ function LedgerReport({ data, onExport }: { data: LedgerData; onExport: (rows: u
 interface SupplierData { suppliers: Array<{ id: number; name: string; phone: string; totalPurchased: number; totalPaid: number; balance: number }>; }
 
 function SupplierReport({ data, onExport }: { data: SupplierData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.suppliers) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Supplier", "Phone", "Total Purchased", "Total Paid", "Balance"],
     ...data.suppliers.map(s => [s.name, s.phone || "", s.totalPurchased, s.totalPaid, s.balance]),
@@ -490,6 +493,7 @@ interface ReceivableData {
 }
 
 function ReceivableReport({ data, onExport }: { data: ReceivableData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.invoices) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Invoice", "Customer", "Phone", "Date", "Total", "Paid", "Balance", "Status"],
     ...data.invoices.map(i => [i.invoiceNo, i.customer, i.phone || "", new Date(i.invoiceDate).toLocaleDateString(), i.totalAmount - i.discount, i.paidAmount, i.balance, i.status]),
@@ -539,6 +543,7 @@ interface PayrollData {
 }
 
 function PayrollReport({ data, onExport }: { data: PayrollData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.salaries) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Type", "Employee/Worker", "Period", "Amount", "Notes"],
     ...data.salaries.map(s => ["Salary", s.employee.name, `${months[s.month - 1]} ${s.year}`, s.netSalary, s.isPaid ? "Paid" : "Unpaid"]),
@@ -618,6 +623,7 @@ interface AccountBalanceData {
 }
 
 function AccountBalanceReport({ data, onExport }: { data: AccountBalanceData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.accounts) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Account", "Type", "Opening Balance", "Total Inflow", "Total Outflow", "Balance"],
     ...data.accounts.map(a => [a.name, a.type, a.openingBalance, a.totalInflow, a.totalOutflow, a.balance]),
@@ -671,6 +677,7 @@ interface CashFlowData {
 }
 
 function CashFlowReport({ data, onExport }: { data: CashFlowData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.inflows) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Type", "Category", "Amount"],
     ...data.inflows.map(i => ["Inflow", i.label, i.amount]),
@@ -717,6 +724,7 @@ interface SalesData {
 }
 
 function SalesReport({ data, onExport }: { data: SalesData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.invoices) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const statusColor = (s: string) => s === "paid" ? "text-emerald-600 bg-emerald-50" : s === "partial" ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
   const csvRows = [
     ["Invoice No", "Date", "Customer", "Amount", "Discount", "Net", "Paid", "Balance", "Status"],
@@ -775,6 +783,7 @@ interface CostAnalysisData {
 
 function CostAnalysisReport({ data, onExport }: { data: CostAnalysisData; onExport: (rows: unknown[][], file: string) => void }) {
   const [showDetails, setShowDetails] = React.useState(false);
+  if (!data?.summary) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Type", "Amount", "%"],
     ...data.summary.map(s => [s.type, s.amount, s.pct + "%"]),
@@ -853,6 +862,7 @@ interface AnnualPayrollData {
 
 function AnnualPayrollReport({ data, onExport }: { data: AnnualPayrollData; onExport: (rows: unknown[][], file: string) => void }) {
   const [expandedEmp, setExpandedEmp] = React.useState<number | null>(null);
+  if (!data?.employees) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Employee", "Designation", "Gross Salary", "Advance Deducted", "Net Salary", "Advances Taken", "Months Paid"],
     ...data.employees.map(e => [e.name, e.designation || "", e.totalGross, e.totalAdvanceDeducted, e.totalNet, e.totalAdvancesTaken, e.monthsPaid]),
@@ -994,6 +1004,7 @@ interface ExpenseSummaryData {
 }
 
 function ExpenseSummaryReport({ data, onExport }: { data: ExpenseSummaryData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.byCategory) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Category", "Amount", "Count", "%"],
     ...data.byCategory.map(e => [e.category, e.amount, e.count, e.pct + "%"]),
@@ -1054,6 +1065,7 @@ interface CollectionData {
 }
 
 function CollectionReport({ data, onExport }: { data: CollectionData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.accounts) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Account", "Invoice", "Customer", "Date", "Amount", "Method"],
     ...data.accounts.flatMap(a => a.payments.map(p => [a.accountName, p.invoiceNo, p.customer, new Date(p.date).toLocaleDateString(), p.amount, p.method || ""])),
@@ -1118,6 +1130,7 @@ interface SalarySheetData {
   totalGross: number; totalDeductions: number; totalNet: number; paidCount: number; unpaidCount: number;
 }
 function SalarySheetReport({ data, onExport }: { data: SalarySheetData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.salarySheet) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Employee", "Designation", "Period", "Base Salary", "Advance Deducted", "Net Salary", "Status", "Account", "Note"],
     ...data.salarySheet.map(r => [r.employee, r.designation, r.period, r.baseSalary, r.advanceDeducted, r.netSalary, r.isPaid ? "Paid" : "Unpaid", r.account, r.note]),
@@ -1182,6 +1195,7 @@ interface AdvanceReportData {
 }
 function AdvanceReportComp({ data, onExport }: { data: AdvanceReportData; onExport: (rows: unknown[][], file: string) => void }) {
   const [view, setView] = React.useState<"detail" | "summary">("detail");
+  if (!data?.advances) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Employee", "Date", "Reason", "Account", "Amount", "Repaid", "Balance", "Status"],
     ...data.advances.map(a => [a.employee, new Date(a.date).toLocaleDateString(), a.reason, a.account, a.amount, a.repaid, a.balance, a.status]),
@@ -1264,6 +1278,7 @@ interface LabourReportData {
   byAccount: Array<{ account: string; amount: number; count: number }>;
 }
 function LabourReportComp({ data, onExport }: { data: LabourReportData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.payments) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Date", "Description", "Account", "Amount", "Note"],
     ...data.payments.map(p => [new Date(p.date).toLocaleDateString(), p.description, p.account, p.amount, p.note]),
@@ -1320,6 +1335,7 @@ interface InvoiceStatusData {
   invoices: Array<{ id: number; invoiceNo: string; date: string; customer: string; totalAmount: number; discount: number; netAmount: number; paidAmount: number; balance: number; status: string; lastPayment: string | null }>;
 }
 function InvoiceStatusReport({ data, onExport }: { data: InvoiceStatusData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.invoices) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const statusColors: Record<string, string> = { paid: "bg-emerald-100 text-emerald-700", partial: "bg-amber-100 text-amber-700", unpaid: "bg-red-100 text-red-700" };
   const csvRows = [
     ["Invoice No", "Date", "Customer", "Total", "Discount", "Net", "Paid", "Balance", "Status"],
@@ -1396,6 +1412,7 @@ interface SupplierLedgerData {
 }
 
 function SupplierLedgerReport({ data, onExport }: { data: SupplierLedgerData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.suppliers) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const handleExport = () => {
     const rows: unknown[][] = [["Supplier", "Date", "Type", "Description", "Debit", "Credit", "Balance"]];
     for (const s of data.suppliers) {
