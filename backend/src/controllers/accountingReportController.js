@@ -190,12 +190,13 @@ const getProfitLoss = async (req, res) => {
     const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
     const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
 
-    const [revenue, expenses, supplierPurchases, labourPayments, salaries] = await Promise.all([
+    const [revenue, expenses, supplierPurchases, labourPayments, salaries, vendorPayments] = await Promise.all([
       prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['categoryId'], where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
       prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
+      prisma.outsourceVendorPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
     ]);
 
     const expCats = await prisma.expenseCategory.findMany({ where: { isActive: true } });
@@ -212,7 +213,8 @@ const getProfitLoss = async (req, res) => {
     const totalPurchases = supplierPurchases._sum.totalAmount || 0;
     const totalLabour = labourPayments._sum.amount || 0;
     const totalSalaries = salaries._sum.netSalary || 0;
-    const totalCosts = totalExpenses + totalPurchases + totalLabour + totalSalaries;
+    const totalVendorPayments = vendorPayments._sum.amount || 0;
+    const totalCosts = totalExpenses + totalPurchases + totalLabour + totalSalaries + totalVendorPayments;
     const netProfit = totalRevenue - totalCosts;
 
     return res.json({
@@ -224,6 +226,7 @@ const getProfitLoss = async (req, res) => {
       supplierPurchases: totalPurchases,
       labourPayments: totalLabour,
       salaries: totalSalaries,
+      vendorPayments: totalVendorPayments,
       totalCosts,
       netProfit,
     });
@@ -358,17 +361,19 @@ const getMonthlyBreakdown = async (req, res) => {
       const from = new Date(year, m - 1, 1);
       const to = new Date(year, m, 0, 23, 59, 59, 999);
 
-      const [rev, exp, purch, lab, sal, adv] = await Promise.all([
+      const [rev, exp, purch, lab, sal, adv, vnd] = await Promise.all([
         prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
         prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
         prisma.supplierPurchase.aggregate({ where: { purchaseDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
         prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
         prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
         prisma.advance.aggregate({ where: { advanceDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+        prisma.outsourceVendorPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       ]);
 
       const revenue = rev._sum.amount || 0;
-      const totalCosts = (exp._sum.amount || 0) + (purch._sum.totalAmount || 0) + (lab._sum.amount || 0) + (sal._sum.netSalary || 0) + (adv._sum.amount || 0);
+      const vendorPmts = vnd._sum.amount || 0;
+      const totalCosts = (exp._sum.amount || 0) + (purch._sum.totalAmount || 0) + (lab._sum.amount || 0) + (sal._sum.netSalary || 0) + (adv._sum.amount || 0) + vendorPmts;
       months.push({
         month: m,
         year,
@@ -378,6 +383,7 @@ const getMonthlyBreakdown = async (req, res) => {
         labour: lab._sum.amount || 0,
         salaries: sal._sum.netSalary || 0,
         advances: adv._sum.amount || 0,
+        vendorPayments: vendorPmts,
         totalCosts,
         netProfit: revenue - totalCosts,
       });
@@ -556,13 +562,14 @@ const getCashFlow = async (req, res) => {
     const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
     const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
 
-    const [invoicePayments, expensesPaid, supplierPaid, advancesPaid, salariesPaid, labourPaid] = await Promise.all([
+    const [invoicePayments, expensesPaid, supplierPaid, advancesPaid, salariesPaid, labourPaid, vendorPaid] = await Promise.all([
       prisma.invoicePayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.expense.aggregate({ where: { expenseDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.supplierPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.advance.aggregate({ where: { advanceDate: { gte: from, lte: to } }, _sum: { amount: true } }),
       prisma.salaryRecord.aggregate({ where: { isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { netSalary: true } }),
       prisma.labourPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
+      prisma.outsourceVendorPayment.aggregate({ where: { paymentDate: { gte: from, lte: to } }, _sum: { amount: true } }),
     ]);
 
     const inflows = [
@@ -574,6 +581,7 @@ const getCashFlow = async (req, res) => {
       { label: 'Employee Advances', amount: advancesPaid._sum.amount || 0 },
       { label: 'Salaries', amount: salariesPaid._sum.netSalary || 0 },
       { label: 'Labour Payments', amount: labourPaid._sum.amount || 0 },
+      { label: 'Vendor Payments (Outsource)', amount: vendorPaid._sum.amount || 0 },
     ];
     const totalIn = inflows.reduce((s, i) => s + i.amount, 0);
     const totalOut = outflows.reduce((s, o) => s + o.amount, 0);
@@ -655,7 +663,7 @@ const getCostAnalysis = async (req, res) => {
     const from = dateFrom ? new Date(dateFrom) : new Date(new Date().getFullYear(), 0, 1);
     const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : new Date();
 
-    const [expByCategory, purchases, labour, salaries, expensesList] = await Promise.all([
+    const [expByCategory, purchases, labour, salaries, expensesList, vendorPayments] = await Promise.all([
       prisma.expense.groupBy({
         by: ['categoryId'],
         where: { expenseDate: { gte: from, lte: to } },
@@ -673,6 +681,11 @@ const getCostAnalysis = async (req, res) => {
         include: { category: { select: { name: true } }, account: { select: { name: true } } },
         orderBy: { expenseDate: 'desc' },
       }),
+      prisma.outsourceVendorPayment.groupBy({
+        by: ['vendorName'],
+        where: { paymentDate: { gte: from, lte: to } },
+        _sum: { amount: true }, _count: true,
+      }),
     ]);
 
     const [cats, sups] = await Promise.all([
@@ -686,7 +699,8 @@ const getCostAnalysis = async (req, res) => {
     const totalPurchases = purchases.reduce((s, p) => s + (p._sum.totalAmount || 0), 0);
     const totalLabour = labour._sum.amount || 0;
     const totalSalaries = salaries._sum.netSalary || 0;
-    const grandTotal = totalExpenses + totalPurchases + totalLabour + totalSalaries;
+    const totalVendorPayments = vendorPayments.reduce((s, v) => s + (v._sum.amount || 0), 0);
+    const grandTotal = totalExpenses + totalPurchases + totalLabour + totalSalaries + totalVendorPayments;
 
     return res.json({
       from: from.toISOString(),
@@ -697,7 +711,13 @@ const getCostAnalysis = async (req, res) => {
         { type: 'Supplier Purchases', amount: totalPurchases, pct: grandTotal > 0 ? Math.round(totalPurchases / grandTotal * 1000) / 10 : 0 },
         { type: 'Labour', amount: totalLabour, pct: grandTotal > 0 ? Math.round(totalLabour / grandTotal * 1000) / 10 : 0 },
         { type: 'Salaries', amount: totalSalaries, pct: grandTotal > 0 ? Math.round(totalSalaries / grandTotal * 1000) / 10 : 0 },
+        { type: 'Vendor Payments (Outsource)', amount: totalVendorPayments, pct: grandTotal > 0 ? Math.round(totalVendorPayments / grandTotal * 1000) / 10 : 0 },
       ],
+      vendorPaymentsByVendor: vendorPayments.map(v => ({
+        vendor: v.vendorName,
+        amount: v._sum.amount || 0,
+        count: v._count,
+      })).sort((a, b) => b.amount - a.amount),
       expensesByCategory: expByCategory.map(e => ({
         category: catMap[e.categoryId] || 'Uncategorized',
         amount: e._sum.amount || 0,
@@ -1147,6 +1167,84 @@ const getSupplierLedgerReport = async (req, res) => {
   }
 };
 
+// ── Production Jobs Report ─────────────────────────────────
+
+const getProductionJobsReport = async (req, res) => {
+  try {
+    const { dateFrom, dateTo, status } = req.query;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+
+    const where = {};
+    if (status && status !== 'all') where.status = status;
+    if (from || to) where.createdAt = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+
+    const jobs = await prisma.productionJob.findMany({
+      where,
+      include: {
+        workEntries: true,
+        vendorPayments: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const report = jobs.map(job => {
+      const workEntries = job.workEntries || [];
+      const payments = job.vendorPayments || [];
+
+      const totalWorkValue = workEntries.reduce((s, e) => s + e.amount, 0);
+      const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+      const outstanding = totalWorkValue - totalPaid;
+
+      const vendorSummary = {};
+      for (const e of workEntries) {
+        if (!vendorSummary[e.vendorName]) vendorSummary[e.vendorName] = { workValue: 0, paid: 0 };
+        vendorSummary[e.vendorName].workValue += e.amount;
+      }
+      for (const p of payments) {
+        if (!vendorSummary[p.vendorName]) vendorSummary[p.vendorName] = { workValue: 0, paid: 0 };
+        vendorSummary[p.vendorName].paid += p.amount;
+      }
+
+      return {
+        id: job.id,
+        collection: job.collection,
+        description: job.description,
+        status: job.status,
+        createdAt: job.createdAt,
+        totalWorkValue,
+        totalPaid,
+        outstanding,
+        vendorCount: Object.keys(vendorSummary).length,
+        vendors: Object.entries(vendorSummary).map(([name, v]) => ({
+          name,
+          workValue: v.workValue,
+          paid: v.paid,
+          balance: v.workValue - v.paid,
+        })),
+      };
+    });
+
+    const totalWorkValue = report.reduce((s, j) => s + j.totalWorkValue, 0);
+    const totalPaid = report.reduce((s, j) => s + j.totalPaid, 0);
+    const totalOutstanding = report.reduce((s, j) => s + j.outstanding, 0);
+
+    return res.json({
+      jobs: report,
+      summary: {
+        totalJobs: report.length,
+        totalWorkValue,
+        totalPaid,
+        totalOutstanding,
+      },
+      dateFrom: dateFrom || null,
+      dateTo: dateTo || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch production jobs report', details: err.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getLedger,
@@ -1168,4 +1266,5 @@ module.exports = {
   getLabourReport,
   getInvoiceStatus,
   getSupplierLedgerReport,
+  getProductionJobsReport,
 };

@@ -12,7 +12,7 @@ import { Loader2, Download, Printer } from "lucide-react";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status" | "supplier-ledger";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status" | "supplier-ledger" | "production-jobs";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -41,6 +41,7 @@ export default function AccountingReportsPage() {
   const [balanceRange, setBalanceRange] = useState({ from: "", to: "" });
   const [supplierLedgerFilter, setSupplierLedgerFilter] = useState({ supplierId: "", from: "", to: "" });
   const [supplierList, setSupplierList] = useState<Array<{ id: number; name: string }>>([]);
+  const [productionJobsFilter, setProductionJobsFilter] = useState({ from: "", to: "", status: "all" });
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
@@ -139,6 +140,12 @@ export default function AccountingReportsPage() {
         if (supplierLedgerFilter.from) params.set("dateFrom", supplierLedgerFilter.from);
         if (supplierLedgerFilter.to) params.set("dateTo", supplierLedgerFilter.to);
         res = await apiGet(`/accounting/reports/supplier-ledger?${params}`);
+      } else if (tab === "production-jobs") {
+        const params = new URLSearchParams();
+        if (productionJobsFilter.from) params.set("dateFrom", productionJobsFilter.from);
+        if (productionJobsFilter.to) params.set("dateTo", productionJobsFilter.to);
+        if (productionJobsFilter.status !== "all") params.set("status", productionJobsFilter.status);
+        res = await apiGet(`/accounting/reports/production-jobs?${params}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -180,6 +187,7 @@ export default function AccountingReportsPage() {
     { key: "labour-report", label: "Labour" },
     { key: "invoice-status", label: "Invoice Status" },
     { key: "supplier-ledger", label: "Supplier Ledger" },
+    { key: "production-jobs", label: "Production Jobs" },
   ];
 
   return (
@@ -295,6 +303,13 @@ export default function AccountingReportsPage() {
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={supplierLedgerFilter.to} onChange={e => setSupplierLedgerFilter({ ...supplierLedgerFilter, to: e.target.value })} className="w-[150px]" /></div>
               </>
             )}
+            {tab === "production-jobs" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={productionJobsFilter.from} onChange={e => setProductionJobsFilter({ ...productionJobsFilter, from: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={productionJobsFilter.to} onChange={e => setProductionJobsFilter({ ...productionJobsFilter, to: e.target.value })} className="w-[150px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Status</p><Select value={productionJobsFilter.status} onChange={val => setProductionJobsFilter({ ...productionJobsFilter, status: val })} options={[{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} className="w-[130px]" /></div>
+              </>
+            )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
           </div>
 
@@ -336,6 +351,8 @@ export default function AccountingReportsPage() {
           <InvoiceStatusReport data={data as unknown as InvoiceStatusData} onExport={exportCSV} />
         ) : tab === "supplier-ledger" ? (
           <SupplierLedgerReport data={data as unknown as SupplierLedgerData} onExport={exportCSV} />
+        ) : tab === "production-jobs" ? (
+          <ProductionJobsReport data={data as unknown as ProductionJobsData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -345,7 +362,7 @@ export default function AccountingReportsPage() {
 interface PLData {
   from: string; to: string;
   revenue: number; expenses: number; expenseBreakdown: Array<{ category: string; amount: number }>;
-  supplierPurchases: number; labourPayments: number; salaries: number;
+  supplierPurchases: number; labourPayments: number; salaries: number; vendorPayments: number;
   totalCosts: number; netProfit: number;
 }
 
@@ -359,6 +376,7 @@ function PLReport({ data, onExport }: { data: PLData; onExport: (rows: unknown[]
     ...data.expenseBreakdown.map(e => [`Expense: ${e.category}`, String(e.amount)] as [string, string]),
     ["Labour Payments", String(data.labourPayments)],
     ["Salaries", String(data.salaries)],
+    ["Vendor Payments (Outsource)", String(data.vendorPayments || 0)],
     ["Total Costs", String(data.totalCosts)],
     ["Net Profit / Loss", String(data.netProfit)],
   ];
@@ -387,6 +405,7 @@ function PLReport({ data, onExport }: { data: PLData; onExport: (rows: unknown[]
             ))}
             <tr><td className="px-4 py-3 text-muted-foreground pl-6">Labour Payments</td><td className="px-4 py-3 text-right text-red-500">Rs {fmt(data.labourPayments)}</td><td className="px-4 py-3 text-right text-muted-foreground">{pct(data.labourPayments, data.revenue)}</td></tr>
             <tr><td className="px-4 py-3 text-muted-foreground pl-6">Salaries</td><td className="px-4 py-3 text-right text-red-500">Rs {fmt(data.salaries)}</td><td className="px-4 py-3 text-right text-muted-foreground">{pct(data.salaries, data.revenue)}</td></tr>
+            {(data.vendorPayments || 0) > 0 && <tr><td className="px-4 py-3 text-muted-foreground pl-6">Vendor Payments (Outsource)</td><td className="px-4 py-3 text-right text-red-500">Rs {fmt(data.vendorPayments || 0)}</td><td className="px-4 py-3 text-right text-muted-foreground">{pct(data.vendorPayments || 0, data.revenue)}</td></tr>}
             <tr className="border-t-2 border-border bg-muted/20"><td className="px-4 py-3 font-semibold">Total Costs</td><td className="px-4 py-3 text-right font-bold text-red-600">Rs {fmt(data.totalCosts)}</td><td className="px-4 py-3 text-right text-muted-foreground">{pct(data.totalCosts, data.revenue)}</td></tr>
             <tr className={data.netProfit >= 0 ? "bg-emerald-50/50" : "bg-red-50/50"}><td className="px-4 py-3 font-bold">Net {data.netProfit >= 0 ? "Profit" : "Loss"}</td><td className={`px-4 py-3 text-right font-bold text-xl ${data.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(Math.abs(data.netProfit))}</td><td className="px-4 py-3 text-right text-muted-foreground">{pct(Math.abs(data.netProfit), data.revenue)}</td></tr>
           </tbody>
@@ -778,6 +797,7 @@ interface CostAnalysisData {
   summary: Array<{ type: string; amount: number; pct: number }>;
   expensesByCategory: Array<{ category: string; amount: number; count: number; pct: number }>;
   purchasesBySupplier: Array<{ supplier: string; amount: number; count: number }>;
+  vendorPaymentsByVendor: Array<{ vendor: string; amount: number; count: number }>;
   expenseDetails: Array<{ date: string; description: string; category: string; account: string; amount: number; billImage: string | null }>;
 }
 
@@ -830,6 +850,18 @@ function CostAnalysisReport({ data, onExport }: { data: CostAnalysisData; onExpo
           </div>
         </div>
       </div>
+      {data.vendorPaymentsByVendor && data.vendorPaymentsByVendor.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold mb-2">Vendor Payments by Vendor (Outsource)</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm"><thead className="bg-muted/30 border-b border-border"><tr><th className="text-left px-3 py-2 font-medium text-muted-foreground">Vendor</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount Paid</th><th className="text-right px-3 py-2 font-medium text-muted-foreground">Txns</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {data.vendorPaymentsByVendor.map((v, i) => <tr key={i} className="hover:bg-muted/20"><td className="px-3 py-2 font-medium">{v.vendor}</td><td className="px-3 py-2 text-right font-semibold text-red-600">Rs {fmt(v.amount)}</td><td className="px-3 py-2 text-right text-muted-foreground">{v.count}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div>
         <button onClick={() => setShowDetails(!showDetails)} className="text-sm text-primary font-medium cursor-pointer hover:underline">{showDetails ? "Hide" : "Show"} expense details ({data.expenseDetails.length} items)</button>
         {showDetails && (
@@ -933,14 +965,14 @@ function AnnualPayrollReport({ data, onExport }: { data: AnnualPayrollData; onEx
 
 interface MonthlyData {
   year: number;
-  months: Array<{ month: number; year: number; revenue: number; expenses: number; purchases: number; labour: number; salaries: number; advances: number; totalCosts: number; netProfit: number }>;
+  months: Array<{ month: number; year: number; revenue: number; expenses: number; purchases: number; labour: number; salaries: number; advances: number; vendorPayments: number; totalCosts: number; netProfit: number }>;
 }
 
 function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows: unknown[][], file: string) => void }) {
   if (!data?.months) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
-    ["Month", "Revenue", "Expenses", "Purchases", "Labour", "Salaries", "Advances", "Total Costs", "Net Profit"],
-    ...data.months.map(m => [months[m.month - 1], m.revenue, m.expenses, m.purchases, m.labour, m.salaries, m.advances, m.totalCosts, m.netProfit]),
+    ["Month", "Revenue", "Expenses", "Purchases", "Labour", "Salaries", "Advances", "Vendor Payments", "Total Costs", "Net Profit"],
+    ...data.months.map(m => [months[m.month - 1], m.revenue, m.expenses, m.purchases, m.labour, m.salaries, m.advances, m.vendorPayments || 0, m.totalCosts, m.netProfit]),
   ];
   const totalRevenue = data.months.reduce((s, m) => s + m.revenue, 0);
   const totalCosts = data.months.reduce((s, m) => s + m.totalCosts, 0);
@@ -954,7 +986,7 @@ function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows:
         </div>
         <Button variant="outline" size="sm" onClick={() => onExport(csvRows, `monthly-${data.year}.csv`)} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
       </div>
-      <div className="bg-background rounded-xl border border-border overflow-hidden">
+      <div className="bg-background rounded-xl border border-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
@@ -964,6 +996,7 @@ function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows:
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Expenses</th>
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Salaries</th>
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Labour</th>
+              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vendor Pmts</th>
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total Costs</th>
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net P&L</th>
             </tr>
@@ -977,6 +1010,7 @@ function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows:
                 <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.expenses)}</td>
                 <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.salaries)}</td>
                 <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.labour)}</td>
+                <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(m.vendorPayments || 0)}</td>
                 <td className="px-4 py-2.5 text-right text-red-600 font-semibold">Rs {fmt(m.totalCosts)}</td>
                 <td className={`px-4 py-2.5 text-right font-bold ${m.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(m.netProfit)}</td>
               </tr>
@@ -986,7 +1020,7 @@ function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows:
             <tr>
               <td className="px-4 py-3 font-bold">Total</td>
               <td className="px-4 py-3 text-right font-bold text-emerald-600">Rs {fmt(totalRevenue)}</td>
-              <td colSpan={4} />
+              <td colSpan={5} />
               <td className="px-4 py-3 text-right font-bold text-red-600">Rs {fmt(totalCosts)}</td>
               <td className={`px-4 py-3 text-right font-bold ${totalRevenue - totalCosts >= 0 ? "text-emerald-600" : "text-red-600"}`}>Rs {fmt(totalRevenue - totalCosts)}</td>
             </tr>
@@ -1480,6 +1514,88 @@ function SupplierLedgerReport({ data, onExport }: { data: SupplierLedgerData; on
             )}
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+interface ProductionJobsData {
+  jobs: Array<{
+    id: number; collection: string; description: string | null; status: string; createdAt: string;
+    totalWorkValue: number; totalPaid: number; outstanding: number; vendorCount: number;
+    vendors: Array<{ name: string; workValue: number; paid: number; balance: number }>;
+  }>;
+  summary: { totalJobs: number; totalWorkValue: number; totalPaid: number; totalOutstanding: number };
+}
+
+function ProductionJobsReport({ data, onExport }: { data: ProductionJobsData; onExport: (rows: unknown[][], file: string) => void }) {
+  const [expandedJob, setExpandedJob] = React.useState<number | null>(null);
+  if (!data?.jobs) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
+
+  const csvRows = [
+    ["Collection", "Description", "Status", "Date", "Work Value", "Paid", "Outstanding", "Vendors"],
+    ...data.jobs.map(j => [j.collection, j.description || "", j.status, new Date(j.createdAt).toLocaleDateString(), j.totalWorkValue, j.totalPaid, j.outstanding, j.vendorCount]),
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-3">
+          <StatBox label="Total Jobs" value={String(data.summary.totalJobs)} color="text-foreground" />
+          <StatBox label="Total Work Value" value={`Rs ${fmt(data.summary.totalWorkValue)}`} color="text-foreground" />
+          <StatBox label="Total Paid" value={`Rs ${fmt(data.summary.totalPaid)}`} color="text-emerald-600" />
+          <StatBox label="Outstanding" value={`Rs ${fmt(data.summary.totalOutstanding)}`} color={data.summary.totalOutstanding > 0 ? "text-amber-600" : "text-emerald-600"} />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, "production-jobs.csv")} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+      {data.jobs.length === 0 ? (
+        <p className="text-center py-12 text-muted-foreground">No production jobs found.</p>
+      ) : (
+        <div className="space-y-2">
+          {data.jobs.map(job => (
+            <div key={job.id} className="rounded-xl border border-border overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 cursor-pointer" onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="font-semibold">{job.collection}</p>
+                    {job.description && <p className="text-xs text-muted-foreground">{job.description}</p>}
+                    <p className="text-xs text-muted-foreground">{new Date(job.createdAt).toLocaleDateString()} · {job.vendorCount} vendor{job.vendorCount !== 1 ? "s" : ""}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${job.status === "active" ? "bg-blue-100 text-blue-700" : job.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{job.status}</span>
+                </div>
+                <div className="flex items-center gap-6 text-sm">
+                  <div className="text-right"><p className="text-xs text-muted-foreground">Work Value</p><p className="font-semibold">Rs {fmt(job.totalWorkValue)}</p></div>
+                  <div className="text-right"><p className="text-xs text-muted-foreground">Paid</p><p className="font-semibold text-emerald-600">Rs {fmt(job.totalPaid)}</p></div>
+                  <div className="text-right"><p className="text-xs text-muted-foreground">Outstanding</p><p className={`font-bold ${job.outstanding > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(job.outstanding)}</p></div>
+                </div>
+              </div>
+              {expandedJob === job.id && job.vendors.length > 0 && (
+                <div className="border-t border-border bg-muted/10">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30 border-b border-border">
+                      <tr>
+                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Vendor</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Work Value</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Paid</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {job.vendors.map((v, i) => (
+                        <tr key={i} className="hover:bg-muted/10">
+                          <td className="px-6 py-2 font-medium">{v.name}</td>
+                          <td className="px-4 py-2 text-right">Rs {fmt(v.workValue)}</td>
+                          <td className="px-4 py-2 text-right text-emerald-600">Rs {fmt(v.paid)}</td>
+                          <td className={`px-4 py-2 text-right font-semibold ${v.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>{v.balance === 0 ? <span className="text-xs text-emerald-600">Cleared</span> : `Rs ${fmt(v.balance)}`}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
