@@ -23,6 +23,7 @@ const {
   getInvoiceStatus,
   getSupplierLedgerReport,
   getProductionJobsReport,
+  getSalaryDueReport,
 } = require('../controllers/accountingReportController');
 
 const accAuth = [authenticate, authorizeAccounting];
@@ -48,5 +49,6 @@ router.get('/labour-report', ...accAuth, getLabourReport);
 router.get('/invoice-status', ...accAuth, getInvoiceStatus);
 router.get('/supplier-ledger', ...accAuth, getSupplierLedgerReport);
 router.get('/production-jobs', ...accAuth, getProductionJobsReport);
+router.get('/salary-due', ...accAuth, getSalaryDueReport);
 
 module.exports = router;

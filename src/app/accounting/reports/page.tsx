@@ -12,7 +12,7 @@ import { Loader2, Download, Printer } from "lucide-react";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function pct(a: number, b: number) { return b === 0 ? "0%" : Math.round((a / b) * 100) + "%"; }
 
-type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status" | "supplier-ledger" | "production-jobs";
+type ReportTab = "pl" | "ledger" | "suppliers" | "receivables" | "payroll" | "monthly" | "expenses" | "collection" | "balance" | "cashflow" | "sales" | "costs" | "annual-payroll" | "salary-sheet" | "advance-report" | "labour-report" | "invoice-status" | "supplier-ledger" | "production-jobs" | "salary-due";
 
 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -42,6 +42,7 @@ export default function AccountingReportsPage() {
   const [supplierLedgerFilter, setSupplierLedgerFilter] = useState({ supplierId: "", from: "", to: "" });
   const [supplierList, setSupplierList] = useState<Array<{ id: number; name: string }>>([]);
   const [productionJobsFilter, setProductionJobsFilter] = useState({ from: "", to: "", status: "all" });
+  const [salaryDueFilter, setSalaryDueFilter] = useState({ month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()) });
 
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
@@ -146,6 +147,11 @@ export default function AccountingReportsPage() {
         if (productionJobsFilter.to) params.set("dateTo", productionJobsFilter.to);
         if (productionJobsFilter.status !== "all") params.set("status", productionJobsFilter.status);
         res = await apiGet(`/accounting/reports/production-jobs?${params}`);
+      } else if (tab === "salary-due") {
+        const params = new URLSearchParams();
+        if (salaryDueFilter.month) params.set("month", salaryDueFilter.month);
+        if (salaryDueFilter.year) params.set("year", salaryDueFilter.year);
+        res = await apiGet(`/accounting/reports/salary-due?${params}`);
       }
       setData(res);
     } catch (err: unknown) {
@@ -188,6 +194,7 @@ export default function AccountingReportsPage() {
     { key: "invoice-status", label: "Invoice Status" },
     { key: "supplier-ledger", label: "Supplier Ledger" },
     { key: "production-jobs", label: "Production Jobs" },
+    { key: "salary-due", label: "Salary Due" },
   ];
 
   return (
@@ -310,6 +317,12 @@ export default function AccountingReportsPage() {
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">Status</p><Select value={productionJobsFilter.status} onChange={val => setProductionJobsFilter({ ...productionJobsFilter, status: val })} options={[{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} className="w-[130px]" /></div>
               </>
             )}
+            {tab === "salary-due" && (
+              <>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Month</p><Select value={salaryDueFilter.month} onChange={val => setSalaryDueFilter({ ...salaryDueFilter, month: val })} options={months.map((m, i) => ({ label: m, value: String(i + 1) }))} className="w-[120px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Year</p><Input type="number" value={salaryDueFilter.year} onChange={e => setSalaryDueFilter({ ...salaryDueFilter, year: e.target.value })} min="2020" max="2030" className="w-[100px]" /></div>
+              </>
+            )}
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
           </div>
 
@@ -353,6 +366,8 @@ export default function AccountingReportsPage() {
           <SupplierLedgerReport data={data as unknown as SupplierLedgerData} onExport={exportCSV} />
         ) : tab === "production-jobs" ? (
           <ProductionJobsReport data={data as unknown as ProductionJobsData} onExport={exportCSV} />
+        ) : tab === "salary-due" ? (
+          <SalaryDueReport data={data as unknown as SalaryDueData} onExport={exportCSV} />
         ) : null}
       </div>
     </DashboardLayout>
@@ -1596,6 +1611,158 @@ function ProductionJobsReport({ data, onExport }: { data: ProductionJobsData; on
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+interface SalaryDueData {
+  month: number; year: number; monthName: string;
+  employees: Array<{
+    id: number; name: string; designation: string;
+    monthlySalary: number; baseSalary: number;
+    outstandingAdvance: number; advanceDeducted: number;
+    netSalary: number; isPaid: boolean; isProcessed: boolean;
+    salaryRecordId: number | null; note: string;
+  }>;
+  summary: {
+    totalEmployees: number; processedCount: number;
+    paidCount: number; unpaidCount: number;
+    totalBase: number; totalDeduct: number; totalNet: number;
+    totalPaid: number; totalPending: number;
+  };
+}
+
+function SalaryDueReport({ data, onExport }: { data: SalaryDueData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.employees) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
+
+  const csvRows = [
+    ["Employee", "Designation", "Base Salary", "Outstanding Advance", "Advance Deducted", "Net Salary", "Status"],
+    ...data.employees.map(e => [
+      e.name, e.designation, e.baseSalary, e.outstandingAdvance,
+      e.advanceDeducted, e.netSalary,
+      e.isPaid ? "Paid" : e.isProcessed ? "Processed (Unpaid)" : "Pending",
+    ]),
+    ["", "", "", "", "", "", ""],
+    ["TOTAL", "", data.summary.totalBase, "", data.summary.totalDeduct, data.summary.totalNet, ""],
+  ];
+
+  const unpaidEmployees = data.employees.filter(e => !e.isPaid);
+  const paidEmployees = data.employees.filter(e => e.isPaid);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-bold">{data.monthName} {data.year} — Salary Due</h2>
+          <p className="text-xs text-muted-foreground">{data.summary.unpaidCount} employees pending · {data.summary.paidCount} paid</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onExport(csvRows, `salary-due-${data.monthName}-${data.year}.csv`)} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatBox label="Total Employees" value={String(data.summary.totalEmployees)} color="text-foreground" />
+        <StatBox label="Total Gross" value={`Rs ${fmt(data.summary.totalBase)}`} color="text-foreground" />
+        <StatBox label="Advance Deductions" value={`Rs ${fmt(data.summary.totalDeduct)}`} color="text-amber-600" />
+        <StatBox label="Net Payable" value={`Rs ${fmt(data.summary.totalNet)}`} color="text-blue-600" />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border p-3 bg-red-50/30">
+          <p className="text-xs font-semibold text-red-700 mb-1">Pending Payment</p>
+          <p className="text-2xl font-bold text-red-600">Rs {fmt(data.summary.totalPending)}</p>
+          <p className="text-xs text-muted-foreground">{data.summary.unpaidCount} employees</p>
+        </div>
+        <div className="rounded-xl border border-border p-3 bg-emerald-50/30">
+          <p className="text-xs font-semibold text-emerald-700 mb-1">Already Paid</p>
+          <p className="text-2xl font-bold text-emerald-600">Rs {fmt(data.summary.totalPaid)}</p>
+          <p className="text-xs text-muted-foreground">{data.summary.paidCount} employees</p>
+        </div>
+      </div>
+
+      {unpaidEmployees.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold mb-2 text-red-700">Pending — Pay These Employees</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-red-50/50 border-b border-border">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base Salary</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Adv. Balance</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deduction</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net to Pay</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {unpaidEmployees.map(e => (
+                  <tr key={e.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">{e.name}</p>
+                      {e.designation && <p className="text-xs text-muted-foreground">{e.designation}</p>}
+                    </td>
+                    <td className="px-4 py-3 text-right">Rs {fmt(e.baseSalary)}</td>
+                    <td className="px-4 py-3 text-right text-amber-600">{e.outstandingAdvance > 0 ? `Rs ${fmt(e.outstandingAdvance)}` : <span className="text-emerald-600 text-xs">None</span>}</td>
+                    <td className="px-4 py-3 text-right text-red-500">{e.advanceDeducted > 0 ? `— Rs ${fmt(e.advanceDeducted)}` : "—"}</td>
+                    <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">Rs {fmt(e.netSalary)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {e.isProcessed
+                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Processed</span>
+                        : <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Not Started</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-border bg-muted/20">
+                <tr>
+                  <td className="px-4 py-3 font-bold">Total Pending</td>
+                  <td className="px-4 py-3 text-right font-bold">Rs {fmt(unpaidEmployees.reduce((s, e) => s + e.baseSalary, 0))}</td>
+                  <td />
+                  <td className="px-4 py-3 text-right font-bold text-red-500">— Rs {fmt(unpaidEmployees.reduce((s, e) => s + e.advanceDeducted, 0))}</td>
+                  <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">Rs {fmt(data.summary.totalPending)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {paidEmployees.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold mb-2 text-emerald-700">Paid Employees</p>
+          <div className="bg-background rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-emerald-50/50 border-b border-border">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deduction</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net Paid</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paidEmployees.map(e => (
+                  <tr key={e.id} className="hover:bg-muted/20 opacity-70">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium">{e.name}</p>
+                      {e.designation && <p className="text-xs text-muted-foreground">{e.designation}</p>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">Rs {fmt(e.baseSalary)}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{e.advanceDeducted > 0 ? `— Rs ${fmt(e.advanceDeducted)}` : "—"}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">Rs {fmt(e.netSalary)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data.employees.length === 0 && (
+        <p className="text-center py-12 text-muted-foreground">No active employees found.</p>
       )}
     </div>
   );
