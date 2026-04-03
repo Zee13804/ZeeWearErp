@@ -18,6 +18,8 @@ interface ProductionJob {
   status: string;
   createdAt: string;
   totalOutsourceCost: number;
+  totalMaterialCost: number;
+  grandTotal: number;
   _count: { workEntries: number };
 }
 
@@ -94,7 +96,9 @@ export default function ProductionJobsPage() {
   };
 
   const filtered = statusFilter === "all" ? jobs : jobs.filter(j => j.status === statusFilter);
-  const totalCost = filtered.reduce((s, j) => s + j.totalOutsourceCost, 0);
+  const totalOutsource = filtered.reduce((s, j) => s + j.totalOutsourceCost, 0);
+  const totalMaterial = filtered.reduce((s, j) => s + j.totalMaterialCost, 0);
+  const totalGrand = filtered.reduce((s, j) => s + j.grandTotal, 0);
   const activeCount = jobs.filter(j => j.status === "active").length;
   const completedCount = jobs.filter(j => j.status === "completed").length;
 
@@ -140,8 +144,9 @@ export default function ProductionJobsPage() {
                 <Wrench className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Outsource Cost</p>
-                <p className="text-2xl font-bold text-orange-600">Rs {fmt(totalCost)}</p>
+                <p className="text-sm text-muted-foreground">Total Cost (Grand)</p>
+                <p className="text-2xl font-bold text-orange-600">Rs {fmt(totalGrand)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Outsource: Rs {fmt(totalOutsource)} &middot; Material: Rs {fmt(totalMaterial)}</p>
               </div>
             </div>
           </div>
@@ -193,15 +198,23 @@ export default function ProductionJobsPage() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg bg-muted/50 p-2.5">
-                    <p className="text-xs text-muted-foreground">Work Entries</p>
+                    <p className="text-xs text-muted-foreground">Entries</p>
                     <p className="text-sm font-semibold text-foreground mt-0.5">{job._count.workEntries}</p>
                   </div>
                   <div className="rounded-lg bg-muted/50 p-2.5">
-                    <p className="text-xs text-muted-foreground">Outsource Cost</p>
+                    <p className="text-xs text-muted-foreground">Outsource</p>
                     <p className="text-sm font-semibold text-orange-600 mt-0.5">Rs {fmt(job.totalOutsourceCost)}</p>
                   </div>
+                  <div className="rounded-lg bg-muted/50 p-2.5">
+                    <p className="text-xs text-muted-foreground">Material</p>
+                    <p className="text-sm font-semibold text-blue-600 mt-0.5">Rs {fmt(job.totalMaterialCost)}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 p-2.5">
+                  <p className="text-xs text-muted-foreground">Grand Total</p>
+                  <p className="text-sm font-bold text-orange-700 dark:text-orange-400 mt-0.5">Rs {fmt(job.grandTotal)}</p>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">

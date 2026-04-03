@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticate, authorize, authorizeAccounting } = require('../middleware/authMiddleware');
 const {
   getJobs, getJob, createJob, updateJob, deleteJob,
-  getWorkEntries, createWorkEntry, deleteWorkEntry,
+  getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
   getCollections,
 } = require('../controllers/productionJobController');
 
@@ -20,6 +20,7 @@ router.delete('/:id', ...adminAuth, deleteJob);
 
 router.get('/:jobId/entries', ...accAuth, getWorkEntries);
 router.post('/:jobId/entries', ...accAuth, createWorkEntry);
+router.put('/entries/:id', ...accAuth, updateWorkEntry);
 router.delete('/entries/:id', ...adminAuth, deleteWorkEntry);
 
 module.exports = router;

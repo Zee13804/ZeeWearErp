@@ -9,21 +9,38 @@ const getJobs = async (req, res) => {
     const where = {};
     if (status) where.status = status;
 
-    const jobs = await prisma.productionJob.findMany({
-      where,
-      include: {
-        _count: { select: { workEntries: true } },
-        workEntries: {
-          select: { totalCost: true },
+    const [jobs, purchases] = await Promise.all([
+      prisma.productionJob.findMany({
+        where,
+        include: {
+          _count: { select: { workEntries: true } },
+          workEntries: { select: { totalCost: true } },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.supplierPurchase.findMany({
+        where: { collection: { not: null } },
+        select: { collection: true, totalAmount: true },
+      }),
+    ]);
 
-    const enriched = jobs.map(job => ({
-      ...job,
-      totalOutsourceCost: job.workEntries.reduce((s, e) => s + e.totalCost, 0),
-    }));
+    const materialByCollection = {};
+    for (const p of purchases) {
+      if (!p.collection) continue;
+      const key = p.collection.toLowerCase().trim();
+      materialByCollection[key] = (materialByCollection[key] || 0) + p.totalAmount;
+    }
+
+    const enriched = jobs.map(job => {
+      const totalOutsourceCost = job.workEntries.reduce((s, e) => s + e.totalCost, 0);
+      const totalMaterialCost = materialByCollection[job.collection.toLowerCase().trim()] || 0;
+      return {
+        ...job,
+        totalOutsourceCost,
+        totalMaterialCost,
+        grandTotal: totalOutsourceCost + totalMaterialCost,
+      };
+    });
 
     return res.json({ jobs: enriched });
   } catch (err) {
@@ -188,6 +205,38 @@ const createWorkEntry = async (req, res) => {
   }
 };
 
+const updateWorkEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workType, vendorName, quantity, ratePerPiece, accountId, workDate, notes } = req.body;
+
+    const existing = await prisma.outsourceWorkEntry.findUnique({ where: { id: parseInt(id) } });
+    if (!existing) return res.status(404).json({ error: 'Work entry not found' });
+
+    const qty = quantity !== undefined ? parseFloat(quantity) : existing.quantity;
+    const rate = ratePerPiece !== undefined ? parseFloat(ratePerPiece) : existing.ratePerPiece;
+    const totalCost = Math.round(qty * rate * 100) / 100;
+
+    const entry = await prisma.outsourceWorkEntry.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(workType && { workType }),
+        ...(vendorName && { vendorName }),
+        quantity: qty,
+        ratePerPiece: rate,
+        totalCost,
+        ...(accountId && { accountId: parseInt(accountId) }),
+        ...(workDate && { workDate: new Date(workDate) }),
+        ...(notes !== undefined && { notes: notes || null }),
+      },
+      include: { account: { select: { id: true, name: true } } },
+    });
+    return res.json({ message: 'Work entry updated', entry });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update work entry', details: err.message });
+  }
+};
+
 const deleteWorkEntry = async (req, res) => {
   try {
     const { id } = req.params;
@@ -218,6 +267,6 @@ const getCollections = async (req, res) => {
 
 module.exports = {
   getJobs, getJob, createJob, updateJob, deleteJob,
-  getWorkEntries, createWorkEntry, deleteWorkEntry,
+  getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
   getCollections,
 };
