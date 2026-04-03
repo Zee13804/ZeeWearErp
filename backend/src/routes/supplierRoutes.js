@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { authenticate, authorize, authorizeAccounting } = require('../middleware/authMiddleware');
 const {
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getPurchases, createPurchase, uploadPurchaseBill, deletePurchase,
@@ -11,20 +11,21 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const adminAuth = [authenticate, authorize('admin')];
+const accAuth = [authenticate, authorizeAccounting];
 
-router.get('/', ...adminAuth, getSuppliers);
-router.post('/', ...adminAuth, createSupplier);
-router.put('/:id', ...adminAuth, updateSupplier);
+router.get('/', ...accAuth, getSuppliers);
+router.post('/', ...accAuth, createSupplier);
+router.put('/:id', ...accAuth, updateSupplier);
 router.delete('/:id', ...adminAuth, deleteSupplier);
-router.get('/:id/ledger', ...adminAuth, getSupplierLedger);
+router.get('/:id/ledger', ...accAuth, getSupplierLedger);
 
-router.get('/purchases', ...adminAuth, getPurchases);
-router.post('/purchases', ...adminAuth, createPurchase);
-router.post('/purchases/:id/bill', ...adminAuth, upload.single('bill'), uploadPurchaseBill);
+router.get('/purchases', ...accAuth, getPurchases);
+router.post('/purchases', ...accAuth, createPurchase);
+router.post('/purchases/:id/bill', ...accAuth, upload.single('bill'), uploadPurchaseBill);
 router.delete('/purchases/:id', ...adminAuth, deletePurchase);
 
-router.get('/payments', ...adminAuth, getSupplierPayments);
-router.post('/payments', ...adminAuth, createSupplierPayment);
+router.get('/payments', ...accAuth, getSupplierPayments);
+router.post('/payments', ...accAuth, createSupplierPayment);
 router.delete('/payments/:id', ...adminAuth, deleteSupplierPayment);
 
 module.exports = router;

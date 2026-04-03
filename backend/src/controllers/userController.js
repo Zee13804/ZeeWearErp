@@ -36,9 +36,9 @@ const createUser = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const validRoles = ['admin', 'store', 'viewer'];
+    const validRoles = ['admin', 'store', 'viewer', 'accountant'];
     if (role && !validRoles.includes(role)) {
-      return res.status(400).json({ error: 'Role must be admin, store, or viewer' });
+      return res.status(400).json({ error: 'Role must be admin, store, viewer, or accountant' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -84,9 +84,9 @@ const updateUser = async (req, res) => {
       return res.status(403).json({ error: 'Only developer accounts can modify users.' });
     }
 
-    const validRoles = ['admin', 'store', 'viewer'];
+    const validRoles = ['admin', 'store', 'viewer', 'accountant'];
     if (role && !validRoles.includes(role)) {
-      return res.status(400).json({ error: 'Role must be admin, store, or viewer' });
+      return res.status(400).json({ error: 'Role must be admin, store, viewer, or accountant' });
     }
 
     const data = {};

@@ -927,6 +927,7 @@ interface MonthlyData {
 }
 
 function MonthlyReport({ data, onExport }: { data: MonthlyData; onExport: (rows: unknown[][], file: string) => void }) {
+  if (!data?.months) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
   const csvRows = [
     ["Month", "Revenue", "Expenses", "Purchases", "Labour", "Salaries", "Advances", "Total Costs", "Net Profit"],
     ...data.months.map(m => [months[m.month - 1], m.revenue, m.expenses, m.purchases, m.labour, m.salaries, m.advances, m.totalCosts, m.netProfit]),

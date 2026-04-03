@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
+import { isAdmin } from "@/lib/auth";
 import { Plus, Edit2, Trash2, ArrowLeftRight, Loader2, Wallet, Eye, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 
 const accountTypes = [
@@ -59,6 +60,7 @@ function fmt(n: number) {
 }
 
 export default function AccountsPage() {
+  const canDelete = isAdmin();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -383,7 +385,7 @@ export default function AccountsPage() {
                       </div>
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(acc)} className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer" title="Edit"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>
-                        <button onClick={() => setDeleteTarget(acc)} className="p-1.5 rounded-md hover:bg-red-50 transition-colors cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                        {canDelete && <button onClick={() => setDeleteTarget(acc)} className="p-1.5 rounded-md hover:bg-red-50 transition-colors cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-border">
@@ -433,7 +435,7 @@ export default function AccountsPage() {
                       <td className="px-4 py-3 text-right font-semibold text-emerald-600">Rs {fmt(t.amount)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{t.note || "—"}</td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => deleteTransfer(t.id)} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                        {canDelete && <button onClick={() => deleteTransfer(t.id)} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </td>
                     </tr>
                   ))}

@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
+import { isAdmin } from "@/lib/auth";
 import { Plus, Trash2, Loader2, CheckCircle, Wallet } from "lucide-react";
 
 interface Account { id: number; name: string; type: string; balance: number; }
@@ -23,6 +24,7 @@ const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const accountTypeIcon: Record<string, string> = { cash: "💵", bank: "🏦", wallet: "📱", other: "🪙" };
 
 export default function EmployeesPage() {
+  const canDelete = isAdmin();
   const [tab, setTab] = useState<Tab>("employees");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -230,7 +232,7 @@ export default function EmployeesPage() {
                         <p className="text-xs text-muted-foreground">{emp.designation || "No designation"}</p>
                         {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
                       </div>
-                      <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                      {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                     </div>
                     <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
                       <div>
@@ -286,7 +288,7 @@ export default function EmployeesPage() {
                                 {a.amount - a.repaid > 0 && (
                                   <button onClick={() => { setRepayTarget(a); setRepayAmount(""); }} className="px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-pointer">Repay</button>
                                 )}
-                                <button onClick={() => setDeleteTarget({ id: a.id, type: "advance", name: `Advance for ${a.employee.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                                {canDelete && <button onClick={() => setDeleteTarget({ id: a.id, type: "advance", name: `Advance for ${a.employee.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                               </div>
                             </td>
                           </tr>
@@ -342,7 +344,7 @@ export default function EmployeesPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button onClick={() => setDeleteTarget({ id: s.id, type: "salary", name: `${s.employee.name} - ${months[s.month - 1]} ${s.year}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              {canDelete && <button onClick={() => setDeleteTarget({ id: s.id, type: "salary", name: `${s.employee.name} - ${months[s.month - 1]} ${s.year}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                             </td>
                           </tr>
                         );
@@ -388,7 +390,7 @@ export default function EmployeesPage() {
                             <td className="px-4 py-3 text-xs text-muted-foreground">{acc ? <span className="flex items-center gap-1"><Wallet className="w-3 h-3" />{acc.name}</span> : "—"}</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">Rs {fmt(l.amount)}</td>
                             <td className="px-4 py-3 text-right">
-                              <button onClick={() => setDeleteTarget({ id: l.id, type: "labour", name: `Payment to ${l.workerName}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              {canDelete && <button onClick={() => setDeleteTarget({ id: l.id, type: "labour", name: `Payment to ${l.workerName}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                             </td>
                           </tr>
                         );

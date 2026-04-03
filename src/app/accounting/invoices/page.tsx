@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
+import { isAdmin } from "@/lib/auth";
 import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, Printer } from "lucide-react";
 
 interface Customer { id: number; name: string; phone?: string; _count?: { invoices: number }; }
@@ -39,6 +40,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const canDelete = isAdmin();
   const [tab, setTab] = useState<Tab>("invoices");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -241,7 +243,7 @@ export default function InvoicesPage() {
                             {uploadingBill === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
                           </button>
                           {inv.billImage && <a href={`/api${inv.billImage}`} target="_blank" rel="noreferrer" className="p-1.5 rounded-md hover:bg-green-50"><Eye className="w-3.5 h-3.5 text-green-600" /></a>}
-                          <button onClick={() => setDeleteTarget({ id: inv.id, name: inv.invoiceNo })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                          {canDelete && <button onClick={() => setDeleteTarget({ id: inv.id, name: inv.invoiceNo })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                         </div>
                       </div>
                       {expandedInvoice === inv.id && (
@@ -291,7 +293,7 @@ export default function InvoicesPage() {
                         <td className="px-4 py-3 text-muted-foreground">{c.phone || "—"}</td>
                         <td className="px-4 py-3 text-right">{c._count?.invoices || 0}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={async () => { try { await apiDelete(`/accounting/invoices/customers/${c.id}`); showToast("Deleted", "success"); load(); } catch { showToast("Failed", "error"); } }} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                          {canDelete && <button onClick={async () => { try { await apiDelete(`/accounting/invoices/customers/${c.id}`); showToast("Deleted", "success"); load(); } catch { showToast("Failed", "error"); } }} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                         </td>
                       </tr>
                     ))}

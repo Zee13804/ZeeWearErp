@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
+import { isAdmin } from "@/lib/auth";
 import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 
 interface Supplier {
@@ -51,6 +52,7 @@ function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigi
 type Tab = "suppliers" | "purchases" | "payments";
 
 export default function SuppliersPage() {
+  const canDelete = isAdmin();
   const [tab, setTab] = useState<Tab>("suppliers");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -257,7 +259,7 @@ export default function SuppliersPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => viewLedger(s.id)} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer" title="View Ledger"><BookOpen className="w-3.5 h-3.5 text-blue-500" /></button>
-                            <button onClick={() => setDeleteTarget({ id: s.id, type: "supplier", name: s.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                            {canDelete && <button onClick={() => setDeleteTarget({ id: s.id, type: "supplier", name: s.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                           </div>
                         </td>
                       </tr>
@@ -288,7 +290,7 @@ export default function SuppliersPage() {
                         {uploadingBill === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
                       </button>
                       {p.billImage && <a href={`/api${p.billImage}`} target="_blank" rel="noreferrer" className="p-1.5 rounded-md hover:bg-green-50"><Eye className="w-3.5 h-3.5 text-green-600" /></a>}
-                      <button onClick={() => setDeleteTarget({ id: p.id, type: "purchase", name: `Purchase from ${p.supplier.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                      {canDelete && <button onClick={() => setDeleteTarget({ id: p.id, type: "purchase", name: `Purchase from ${p.supplier.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                     </div>
                   </div>
                   {expandedPurchase === p.id && p.items.length > 0 && (
@@ -331,7 +333,7 @@ export default function SuppliersPage() {
                       <td className="px-4 py-3 text-right font-semibold text-emerald-600">Rs {fmt(p.amount)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{p.note || "—"}</td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => setDeleteTarget({ id: p.id, type: "payment", name: `Payment of Rs ${fmt(p.amount)}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                        {canDelete && <button onClick={() => setDeleteTarget({ id: p.id, type: "payment", name: `Payment of Rs ${fmt(p.amount)}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </td>
                     </tr>
                   ))}

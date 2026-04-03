@@ -61,6 +61,21 @@ const authorize = (...roles) => {
   };
 };
 
+const authorizeAccounting = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Access denied. Not authenticated.' });
+  }
+  const { role } = req.user;
+  if (role === 'dev' || role === 'admin') return next();
+  if (role === 'accountant') {
+    if (req.method === 'DELETE') {
+      return res.status(403).json({ error: 'Accountants cannot delete records. Contact an admin.' });
+    }
+    return next();
+  }
+  return res.status(403).json({ error: 'Forbidden. Insufficient permissions.' });
+};
+
 const authenticateAndEnforceReadOnly = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -125,4 +140,4 @@ const requirePermission = (...permissionKeys) => {
   };
 };
 
-module.exports = { authenticate, authorize, authenticateAndEnforceReadOnly, requirePermission, JWT_SECRET };
+module.exports = { authenticate, authorize, authorizeAccounting, authenticateAndEnforceReadOnly, requirePermission, JWT_SECRET };

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { authenticate, authorize, authorizeAccounting } = require('../middleware/authMiddleware');
 const {
   getCustomers, createCustomer, updateCustomer, deleteCustomer,
   getInvoices, createInvoice, updateInvoiceStatus, uploadInvoiceBill, deleteInvoice,
@@ -10,20 +10,21 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const adminAuth = [authenticate, authorize('admin')];
+const accAuth = [authenticate, authorizeAccounting];
 
-router.get('/customers', ...adminAuth, getCustomers);
-router.post('/customers', ...adminAuth, createCustomer);
-router.put('/customers/:id', ...adminAuth, updateCustomer);
+router.get('/customers', ...accAuth, getCustomers);
+router.post('/customers', ...accAuth, createCustomer);
+router.put('/customers/:id', ...accAuth, updateCustomer);
 router.delete('/customers/:id', ...adminAuth, deleteCustomer);
 
-router.get('/', ...adminAuth, getInvoices);
-router.post('/', ...adminAuth, createInvoice);
-router.put('/:id/status', ...adminAuth, updateInvoiceStatus);
-router.post('/:id/bill', ...adminAuth, upload.single('bill'), uploadInvoiceBill);
+router.get('/', ...accAuth, getInvoices);
+router.post('/', ...accAuth, createInvoice);
+router.put('/:id/status', ...accAuth, updateInvoiceStatus);
+router.post('/:id/bill', ...accAuth, upload.single('bill'), uploadInvoiceBill);
 router.delete('/:id', ...adminAuth, deleteInvoice);
 
-router.get('/payments', ...adminAuth, getInvoicePayments);
-router.post('/payments', ...adminAuth, createInvoicePayment);
+router.get('/payments', ...accAuth, getInvoicePayments);
+router.post('/payments', ...accAuth, createInvoicePayment);
 router.delete('/payments/:id', ...adminAuth, deleteInvoicePayment);
 
 module.exports = router;

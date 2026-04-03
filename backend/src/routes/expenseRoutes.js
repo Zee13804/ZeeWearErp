@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { authenticate, authorize, authorizeAccounting } = require('../middleware/authMiddleware');
 const {
   getCategories, createCategory, deleteCategory,
   getExpenses, createExpense, updateExpense, uploadExpenseBill, deleteExpense,
@@ -9,15 +9,16 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const adminAuth = [authenticate, authorize('admin')];
+const accAuth = [authenticate, authorizeAccounting];
 
-router.get('/categories', ...adminAuth, getCategories);
-router.post('/categories', ...adminAuth, createCategory);
+router.get('/categories', ...accAuth, getCategories);
+router.post('/categories', ...accAuth, createCategory);
 router.delete('/categories/:id', ...adminAuth, deleteCategory);
 
-router.get('/', ...adminAuth, getExpenses);
-router.post('/', ...adminAuth, createExpense);
-router.put('/:id', ...adminAuth, updateExpense);
-router.post('/:id/bill', ...adminAuth, upload.single('bill'), uploadExpenseBill);
+router.get('/', ...accAuth, getExpenses);
+router.post('/', ...accAuth, createExpense);
+router.put('/:id', ...accAuth, updateExpense);
+router.post('/:id/bill', ...accAuth, upload.single('bill'), uploadExpenseBill);
 router.delete('/:id', ...adminAuth, deleteExpense);
 
 module.exports = router;

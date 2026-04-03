@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
+import { isAdmin } from "@/lib/auth";
 import { Plus, Trash2, Loader2, Eye, Upload } from "lucide-react";
 
 interface Category { id: number; name: string; type: string; _count?: { expenses: number }; }
@@ -37,6 +38,7 @@ const catTypes = [
 ];
 
 export default function ExpensesPage() {
+  const canDelete = isAdmin();
   const [tab, setTab] = useState<Tab>("expenses");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -208,7 +210,7 @@ export default function ExpensesPage() {
                                 {uploadingBill === exp.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
                               </button>
                               {exp.billImage && <a href={`/api${exp.billImage}`} target="_blank" rel="noreferrer" className="p-1.5 rounded-md hover:bg-green-50"><Eye className="w-3.5 h-3.5 text-green-600" /></a>}
-                              <button onClick={() => setDeleteTarget({ id: exp.id, type: "expense", name: exp.description })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              {canDelete && <button onClick={() => setDeleteTarget({ id: exp.id, type: "expense", name: exp.description })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                             </div>
                           </td>
                         </tr>
@@ -237,7 +239,7 @@ export default function ExpensesPage() {
                         <td className="px-4 py-3 text-muted-foreground capitalize">{cat.type}</td>
                         <td className="px-4 py-3 text-right">{cat._count?.expenses || 0}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => setDeleteTarget({ id: cat.id, type: "category", name: cat.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                          {canDelete && <button onClick={() => setDeleteTarget({ id: cat.id, type: "category", name: cat.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                         </td>
                       </tr>
                     ))}

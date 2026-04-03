@@ -184,6 +184,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
   const [accountingOpen, setAccountingOpen] = useState(false);
   const { canViewPage, role } = usePermissions();
   const admin = role === "admin" || role === "dev";
+  const isAccountant = role === "accountant";
   const isAccountingActive = pathname.startsWith("/accounting");
 
   useEffect(() => {
@@ -275,7 +276,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
           );
         })}
 
-        {admin && (
+        {(admin || isAccountant) && (
           <div>
             <button
               onClick={() => { if (!collapsed) setAccountingOpen(o => !o); else setAccountingOpen(true); }}

@@ -13,8 +13,8 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    if (role && !['admin', 'store', 'viewer', 'dev'].includes(role)) {
-      return res.status(400).json({ error: 'Role must be admin, store, viewer, or dev' });
+    if (role && !['admin', 'store', 'viewer', 'dev', 'accountant'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be admin, store, viewer, accountant, or dev' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });

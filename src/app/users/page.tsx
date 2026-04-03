@@ -242,6 +242,7 @@ export default function UsersPage() {
                     >
                       <option value="store">Store</option>
                       <option value="viewer">Viewer</option>
+                      <option value="accountant">Accountant</option>
                       <option value="admin">Admin</option>
                     </select>
                     <Button type="submit" disabled={creating} className="gap-2 cursor-pointer">
@@ -290,6 +291,7 @@ export default function UsersPage() {
                                   >
                                     <option value="store">Store</option>
                                     <option value="viewer">Viewer</option>
+                                    <option value="accountant">Accountant</option>
                                     <option value="admin">Admin</option>
                                   </select>
                                 ) : (
