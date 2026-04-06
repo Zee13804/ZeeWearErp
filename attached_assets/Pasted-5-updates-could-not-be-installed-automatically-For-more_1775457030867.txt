@@ -1,0 +1,134 @@
+5 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+Last login: Sat Apr  4 17:26:33 2026 from 169.254.0.1
+root@srv1527649:~# cd /www/wwwroot/zeewear.devoriatech.com
+
+# 1. Latest code pull karo
+git pull origin main
+
+# 2. Backend packages install (axios, node-cron, pdfkit pehle se install hain)
+cd backend && npm install && cd ..
+
+# 3. AppSetting table banao database mein
+DATABASE_URL="file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db" \
+  backend/node_modules/.bin/prisma db push \
+  --schema=backend/prisma/schema.prisma
+
+# 4. Frontend build karo
+npm run build
+
+# 5. PM2 restart karo
+pm2 restart all
+remote: Enumerating objects: 256, done.
+remote: Counting objects: 100% (256/256), done.
+remote: Compressing objects: 100% (24/24), done.
+remote: Total 156 (delta 118), reused 155 (delta 117), pack-reused 0 (from 0)
+Receiving objects: 100% (156/156), 45.77 KiB | 7.63 MiB/s, done.
+Resolving deltas: 100% (118/118), completed with 63 local objects.
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+   5d781b3..a49c42a  main       -> origin/main
+Updating 5d781b3..a49c42a
+error: Your local changes to the following files would be overwritten by merge:
+        .next/BUILD_ID
+        .next/build-manifest.json
+        .next/fallback-build-manifest.json
+        .next/prerender-manifest.json
+        .next/server/app/_global-error.html
+        .next/server/app/_global-error.rsc
+        .next/server/app/_global-error.segments/__PAGE__.segment.rsc
+        .next/server/app/_global-error.segments/_full.segment.rsc
+        .next/server/app/_global-error.segments/_head.segment.rsc
+        .next/server/app/_global-error.segments/_index.segment.rsc
+        .next/server/app/_global-error.segments/_tree.segment.rsc
+        .next/server/app/_not-found.html
+        .next/server/app/_not-found.rsc
+        .next/server/app/_not-found.segments/_full.segment.rsc
+        .next/server/app/_not-found.segments/_head.segment.rsc
+        .next/server/app/_not-found.segments/_index.segment.rsc
+        .next/server/app/_not-found.segments/_not-found.segment.rsc
+        .next/server/app/_not-found.segments/_not-found/__PAGE__.segment.rsc
+        .next/server/app/_not-found.segments/_tree.segment.rsc
+        .next/server/app/accessories.html
+        .next/server/app/accessories.rsc
+        .next/server/app/accessories.segments/_full.segment.rsc
+        .next/server/app/accessories.segments/_head.segment.rsc
+        .next/server/app/accessories.segments/_index.segment.rsc
+        .next/server/app/accessories.segments/_tree.segment.rsc
+        .next/server/app/accessories.segments/accessories.segment.rsc
+        .next/server/app/accessories.segments/accessories/__PAGE__.segment.rsc
+        .next/server/app/articles.html
+        .next/server/app/articles.rsc
+        .next/server/app/articles.segments/_full.segment.rsc
+        .next/server/app/articles.segments/_head.segment.rsc
+        .next/server/app/articles.segments/_index.segment.rsc
+        .next/server/app/articles.segments/_tree.segment.rsc
+        .next/server/app/articles.segments/articles.segment.rsc
+        .next/server/app/articles.segments/articles/__PAGE__.segment.rsc
+        .next/server/app/dashboard.html
+        .next/server/app/dashboard.rsc
+        .next/server/app/dashboard.segments/_full.segment.rsc
+        .next/server/app/dashboard.segments/_head.segment.rsc
+        .next/server/app/dashboard.segments/_index.segment.rsc
+        .next/server/app/dashboard.segments/_tree.segment.rsc
+        .next/server/app/dashboard.segments/dashboard.segment.rsc
+        .next/server/app/dashboard.segments/dashboard/__PAGE__.segment.rsc
+        .next/server/app/fabric.html
+        .next/server/app/fabric.rsc
+        .next/server/app/fabric.segments/_full.segment.rsc
+        .next/server/app/fabric.segments/_head.segment.rsc
+        .next/server/app/fabric.segments/_index.segment.rsc
+        .next/server/app/fabric.segments/_tree.segment.rsc
+        .next/server/app/fabric.segments/fabric.segment.rsc
+        .next/server/app/fabric.segments/fabric/__PAGE__.segment.rsc
+        .next/server/app/import.html
+        .next/server/app/import.rsc
+        .next/server/app/import.segments/_full.segment.rsc
+        .next/server/app/import.segments/_head.segment.rsc
+        .next/server/app/import.segments/_index.segment.rsc
+        .next/server/app/import.segments/_tree.segment.rsc
+        .next/server/app/import.segments/import.segment.rsc
+        .next/server/app/import.segments/import/__PAGE__.segment.rsc
+        .next/server/app/index.html
+        .next/server/app/index.rsc
+        .next/server/app/index.segments/__PAGE__.segment.rsc
+        .next/server/app/index.segments/_full.segment.rsc
+        .next/server/app/index.segments/_head.segment.rsc
+        .next/server/app/index.segments/_index.segment.rsc
+        .next/server/app/index.segments/_tree.segment.rsc
+        .next/server/app/login.html
+        .next/server/app/login.rsc
+        .next/server/app/login.segments/_full.segment.rsc
+        .next/server/app/login.segments/_head.segment.rsc
+        .next/server/app/login.segments/_index.segment.rsc
+        .next/server/app/login.segments/_tree.segment.rsc
+        .next/server/app/login.segments/login.segment.rsc
+        .next/server/app/login.segments/login/__PAGE__.segment.rsc
+        .next/server/app/reports.html
+        .next/server/app/reports.rsc
+        .next/server/app/reports.segments/_full.segment.rsc
+        .next/server/app/reports.segments/_head.segment.rsc
+        .next/server/app/reports.segments/_index.segment.rsc
+        .next/server/app/reports.segments/_tree.segment.rsc
+        .next/server/app/reports.segments/reports.segment.rsc
+        .next/server/app/reports.segments/reports/__PAGE__.segment.rsc
+        .next/server
+Aborting
+Command 'npm' not found, but can be installed with:
+apt install npm
+-bash: backend/node_modules/.bin/prisma: No such file or directory
+Command 'npm' not found, but can be installed with:
+apt install npm
+Command 'pm2' not found, did you mean:
+  command 'tpm2' from deb tpm2-tools (5.4-1)
+  command 'pm' from deb powerman (2.3.27-4)
+  command 'pmg' from deb python3-pymatgen (2023.06.23+dfsg1-2build1)
+  command 'pom2' from deb libpod-pom-perl (2.01-4)
+  command 'pmw' from deb pmw (1:5.22-1)
+  command 'wm2' from deb wm2 (4+svn20090216-4build1)
+  command 'pms' from deb pms (0.42-1.1)
+  command 'pmc' from deb linuxptp (4.0-1ubuntu1.1)
+  command 'gm2' from deb gm2 (4:13.2.0-2ubuntu1)
+Try: apt install <deb name>
+root@srv1527649:/www/wwwroot/zeewear.devoriatech.com/backend# 
