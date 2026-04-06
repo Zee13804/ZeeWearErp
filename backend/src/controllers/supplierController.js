@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { notifySupplierPayment } = require('../services/notificationService');
 const path = require('path');
 const fs = require('fs');
 const { compressToUnder50KB } = require('../utils/compressImage');
@@ -228,6 +229,7 @@ const createSupplierPayment = async (req, res) => {
         account: { select: { id: true, name: true } },
       },
     });
+    notifySupplierPayment(payment.supplier?.name || '', payment.amount, payment.account?.name || '').catch(() => {});
     return res.status(201).json({ message: 'Payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create payment', details: err.message });

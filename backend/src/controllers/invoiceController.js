@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const path = require('path');
 const fs = require('fs');
 const { compressToUnder50KB } = require('../utils/compressImage');
+const { notifyInvoiceCreated, notifyInvoicePayment } = require('../services/notificationService');
 
 // ── Customers ─────────────────────────────────────────────
 
@@ -163,6 +164,7 @@ const createInvoice = async (req, res) => {
       }
     }
 
+    notifyInvoiceCreated(invoice).catch(() => {});
     return res.status(201).json({ message: 'Invoice created', invoice });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create invoice', details: err.message });
@@ -269,10 +271,13 @@ const createInvoicePayment = async (req, res) => {
     if (paidAmount >= invoice.totalAmount - invoice.discount) status = 'paid';
     else if (paidAmount > 0) status = 'partial';
 
-    await prisma.invoice.update({
+    const updatedInvoice = await prisma.invoice.update({
       where: { id: parseInt(invoiceId) },
       data: { paidAmount, status },
+      include: { customer: { select: { name: true } } },
     });
+    const account = await prisma.account.findUnique({ where: { id: parseInt(accountId) } });
+    notifyInvoicePayment(updatedInvoice, parseFloat(amount), account?.name || '').catch(() => {});
 
     return res.status(201).json({ message: 'Payment recorded', payment });
   } catch (err) {

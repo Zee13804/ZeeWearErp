@@ -30,6 +30,7 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const accountingReportRoutes = require("./routes/accountingReportRoutes");
 const productionJobRoutes = require("./routes/productionJobRoutes");
 const courierPaymentRoutes = require("./routes/courierPaymentRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
 
 const { authenticate, authenticateAndEnforceReadOnly } = require("./middleware/authMiddleware");
 
@@ -69,6 +70,10 @@ app.use("/accounting/employees", employeeRoutes);
 app.use("/accounting/reports", accountingReportRoutes);
 app.use("/accounting/production-jobs", productionJobRoutes);
 app.use("/accounting/courier-payments", courierPaymentRoutes);
+app.use("/settings", settingsRoutes);
+
+const { startScheduler } = require('./services/schedulerService');
+startScheduler().catch(err => console.error('[Scheduler] Start failed:', err.message));
 
 const { PrismaClient } = require('@prisma/client');
 (async () => {

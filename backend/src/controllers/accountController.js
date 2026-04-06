@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { notifyTransfer } = require('../services/notificationService');
 
 // ── Accounts ──────────────────────────────────────────────
 
@@ -279,6 +280,10 @@ const createTransfer = async (req, res) => {
     if (fromAccountId === toAccountId)
       return res.status(400).json({ error: 'Cannot transfer to the same account' });
 
+    const [fromAcc, toAcc] = await Promise.all([
+      prisma.account.findUnique({ where: { id: parseInt(fromAccountId) } }),
+      prisma.account.findUnique({ where: { id: parseInt(toAccountId) } }),
+    ]);
     const transfer = await prisma.accountTransfer.create({
       data: {
         fromAccountId: parseInt(fromAccountId),
@@ -288,6 +293,7 @@ const createTransfer = async (req, res) => {
         date: date ? new Date(date) : new Date(),
       },
     });
+    notifyTransfer(fromAcc?.name || '', toAcc?.name || '', parseFloat(amount), note).catch(() => {});
     return res.status(201).json({ message: 'Transfer recorded', transfer });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create transfer', details: err.message });

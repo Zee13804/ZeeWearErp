@@ -129,6 +129,13 @@ model Purpose {
   createdAt DateTime @default(now())
 }
 
+model AppSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model Image {
   id        Int      @id @default(autoincrement())
   url       String

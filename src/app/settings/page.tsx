@@ -8,9 +8,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { showToast } from "@/components/ui/toast";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
-import { Plus, Trash2, Tag, Lock, Download, Upload, Database, Loader2, Image, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Tag, Lock, Download, Upload, Database, Loader2, Image, FileText, CheckCircle2, AlertCircle, Bell, Send } from "lucide-react";
 import { isAdmin } from "@/lib/auth";
 import { usePermissions } from "@/lib/permissions";
+
+interface NotificationSettings {
+  telegramBotToken: string;
+  telegramChatId: string;
+  dailyReportTime: string;
+  notifyInvoiceCreated: boolean;
+  notifyInvoicePayment: boolean;
+  notifyTransfer: boolean;
+  notifyExpense: boolean;
+  notifySupplierPayment: boolean;
+  notifySalaryPaid: boolean;
+  notifyAdvance: boolean;
+  notifyCourierPayment: boolean;
+  notifyDailyReport: boolean;
+}
 
 interface Purpose {
   id: number;
@@ -33,6 +48,25 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const { canPerformAction } = usePermissions();
+
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
+    telegramBotToken: "",
+    telegramChatId: "",
+    dailyReportTime: "23:00",
+    notifyInvoiceCreated: true,
+    notifyInvoicePayment: true,
+    notifyTransfer: true,
+    notifyExpense: true,
+    notifySupplierPayment: true,
+    notifySalaryPaid: true,
+    notifyAdvance: true,
+    notifyCourierPayment: true,
+    notifyDailyReport: true,
+  });
+  const [loadingNotif, setLoadingNotif] = useState(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+  const [testingNotif, setTestingNotif] = useState(false);
+  const [sendingReport, setSendingReport] = useState(false);
 
   const handleDownloadBackup = async () => {
     setDownloadingBackup(true);
@@ -194,6 +228,71 @@ export default function SettingsPage() {
     }
   };
 
+  useEffect(() => {
+    const fetchNotifSettings = async () => {
+      try {
+        const data = await apiGet("/settings");
+        setNotifSettings((prev) => ({ ...prev, ...data }));
+      } catch {
+      } finally {
+        setLoadingNotif(false);
+      }
+    };
+    if (isAdmin()) fetchNotifSettings();
+  }, []);
+
+  const handleSaveNotifSettings = async () => {
+    setSavingNotif(true);
+    try {
+      await apiPost("/settings", notifSettings);
+      showToast("Notification settings saved", "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to save settings", "error");
+    } finally {
+      setSavingNotif(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (!notifSettings.telegramBotToken || !notifSettings.telegramChatId) {
+      showToast("Please enter Bot Token and Chat ID first", "error");
+      return;
+    }
+    setTestingNotif(true);
+    try {
+      const res = await apiPost("/settings/test-notification", {});
+      showToast(res.message || "Test sent!", "success");
+    } catch (err: any) {
+      showToast(err.message || "Test failed", "error");
+    } finally {
+      setTestingNotif(false);
+    }
+  };
+
+  const handleSendReportNow = async () => {
+    setSendingReport(true);
+    try {
+      const res = await apiPost("/settings/send-report-now", {});
+      showToast(res.message || "Report sent!", "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to send report", "error");
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
+  const notifToggles: { key: keyof NotificationSettings; label: string }[] = [
+    { key: "notifyInvoiceCreated", label: "New Invoice Created" },
+    { key: "notifyInvoicePayment", label: "Invoice Payment Received" },
+    { key: "notifyTransfer", label: "Account Transfer" },
+    { key: "notifyExpense", label: "Expense Added" },
+    { key: "notifySupplierPayment", label: "Supplier Payment" },
+    { key: "notifySalaryPaid", label: "Salary Paid" },
+    { key: "notifyAdvance", label: "Advance Given" },
+    { key: "notifyCourierPayment", label: "Courier Payment" },
+    { key: "notifyDailyReport", label: "Daily PDF Report" },
+  ];
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -307,6 +406,91 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+        {isAdmin() && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                <CardTitle>Telegram Notifications</CardTitle>
+              </div>
+              <CardDescription>
+                Configure a Telegram bot to receive instant alerts and daily PDF reports
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {loadingNotif ? (
+                <p className="text-sm text-muted-foreground">Loading settings...</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Bot Token</label>
+                      <Input
+                        placeholder="123456:ABC-DEF..."
+                        value={notifSettings.telegramBotToken}
+                        onChange={(e) => setNotifSettings((p) => ({ ...p, telegramBotToken: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">Get from @BotFather on Telegram</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Chat ID</label>
+                      <Input
+                        placeholder="-100123456789"
+                        value={notifSettings.telegramChatId}
+                        onChange={(e) => setNotifSettings((p) => ({ ...p, telegramChatId: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">Your personal or group chat ID</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Daily Report Time (PKT)</label>
+                    <Input
+                      type="time"
+                      className="w-40"
+                      value={notifSettings.dailyReportTime}
+                      onChange={(e) => setNotifSettings((p) => ({ ...p, dailyReportTime: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">PDF summary sent daily at this time (Pakistan Standard Time)</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notify On</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {notifToggles.map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer select-none border rounded-md px-3 py-2 text-sm hover:bg-muted/40 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={!!notifSettings[key]}
+                            onChange={(e) => setNotifSettings((p) => ({ ...p, [key]: e.target.checked }))}
+                            className="w-4 h-4 accent-primary"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Button onClick={handleSaveNotifSettings} disabled={savingNotif}>
+                      {savingNotif ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      {savingNotif ? "Saving..." : "Save Settings"}
+                    </Button>
+                    <Button variant="outline" onClick={handleTestNotification} disabled={testingNotif}>
+                      {testingNotif ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                      {testingNotif ? "Sending..." : "Send Test Message"}
+                    </Button>
+                    <Button variant="outline" onClick={handleSendReportNow} disabled={sendingReport}>
+                      {sendingReport ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
+                      {sendingReport ? "Sending..." : "Send Report Now"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {isAdmin() && (
           <Card>
             <CardHeader>

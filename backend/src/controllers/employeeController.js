@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { notifySalaryPaid, notifyAdvance } = require('../services/notificationService');
 
 // ── Employees ─────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ const createAdvance = async (req, res) => {
       },
       include: { employee: { select: { id: true, name: true } } },
     });
+    notifyAdvance(advance.employee?.name || '', advance.amount).catch(() => {});
     return res.status(201).json({ message: 'Advance recorded', advance });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create advance', details: err.message });
@@ -248,7 +250,9 @@ const markSalaryPaid = async (req, res) => {
         paidAt: new Date(),
         accountId: parseInt(accountId),
       },
+      include: { employee: { select: { name: true } } },
     });
+    notifySalaryPaid(salary.employee?.name || '', salary.netSalary).catch(() => {});
     return res.json({ message: 'Salary marked as paid', salary });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update salary', details: err.message });

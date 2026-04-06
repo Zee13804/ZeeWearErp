@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const path = require('path');
 const fs = require('fs');
 const { compressToUnder50KB } = require('../utils/compressImage');
+const { notifyExpense } = require('../services/notificationService');
 
 // ── Expense Categories ────────────────────────────────────
 
@@ -94,6 +95,7 @@ const createExpense = async (req, res) => {
         account: { select: { id: true, name: true } },
       },
     });
+    notifyExpense(expense.amount, expense.description, expense.category?.name || '', expense.account?.name || '').catch(() => {});
     return res.status(201).json({ message: 'Expense recorded', expense });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create expense', details: err.message });
