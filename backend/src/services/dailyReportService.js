@@ -64,7 +64,7 @@ async function generateDailyReport() {
       },
     }),
     prisma.advance.findMany({
-      where: { date: { gte: start, lte: end } },
+      where: { advanceDate: { gte: start, lte: end } },
       include: { employee: { select: { name: true } } },
     }),
     prisma.salaryRecord.findMany({
