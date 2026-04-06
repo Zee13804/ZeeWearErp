@@ -12,16 +12,11 @@ async function getSetting(key) {
 }
 
 async function getNotifSettings() {
-  const [token, chatId, enabled] = await Promise.all([
+  const [token, chatId] = await Promise.all([
     getSetting('telegram_bot_token'),
     getSetting('telegram_chat_id'),
-    getSetting('notifications_enabled'),
   ]);
-  return {
-    token,
-    chatId,
-    enabled: enabled === 'true',
-  };
+  return { token, chatId };
 }
 
 async function isEventEnabled(eventKey) {
@@ -30,8 +25,8 @@ async function isEventEnabled(eventKey) {
 }
 
 async function sendTelegramMessage(text) {
-  const { token, chatId, enabled } = await getNotifSettings();
-  if (!enabled || !token || !chatId) return;
+  const { token, chatId } = await getNotifSettings();
+  if (!token || !chatId) return;
   try {
     await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
       chat_id: chatId,
@@ -44,8 +39,8 @@ async function sendTelegramMessage(text) {
 }
 
 async function sendTelegramDocument(buffer, filename, caption) {
-  const { token, chatId, enabled } = await getNotifSettings();
-  if (!enabled || !token || !chatId) return;
+  const { token, chatId } = await getNotifSettings();
+  if (!token || !chatId) return;
   try {
     const FormData = require('form-data');
     const form = new FormData();
