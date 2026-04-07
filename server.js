@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 
 try {
   require("dotenv").config({ path: path.join(__dirname, ".env") });
@@ -41,6 +42,37 @@ nextApp.prepare().then(() => {
     res.on("close", () => clearTimeout(timer));
     next();
   });
+
+  if (!dev) {
+    const chunksDir = path.join(__dirname, ".next", "static", "chunks");
+    server.get("/_next/static/chunks/:filename", (req, res, next) => {
+      const filename = req.params.filename;
+      const requestedPath = path.join(chunksDir, filename);
+
+      if (!fs.existsSync(requestedPath)) {
+        const isCss = filename.endsWith(".css");
+        const isMuxJs = filename.endsWith(".mux.js");
+
+        if (isCss || isMuxJs) {
+          try {
+            const files = fs.readdirSync(chunksDir).filter(f =>
+              isCss ? f.endsWith(".css") : f.endsWith(".mux.js")
+            );
+            if (files.length > 0) {
+              const actualFile = path.join(chunksDir, files[0]);
+              const contentType = isCss ? "text/css" : "application/javascript";
+              res.setHeader("Content-Type", contentType);
+              res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+              return res.sendFile(actualFile);
+            }
+          } catch (e) {
+            console.error("[ChunkFallback] Error:", e.message);
+          }
+        }
+      }
+      next();
+    });
+  }
 
   const backendApp = require("./backend/src/server");
   server.use("/api", backendApp);
