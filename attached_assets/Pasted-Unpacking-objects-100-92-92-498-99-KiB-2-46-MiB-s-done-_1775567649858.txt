@@ -1,0 +1,38 @@
+Unpacking objects: 100% (92/92), 498.99 KiB | 2.46 MiB/s, done.
+From https://github.com/Zee13804/ZeeWearErp
+   ad9734b..56986af  main       -> origin/main
+Updating ad9734b..56986af
+Fast-forward
+ attached_assets/Pasted--Documentation-https-help-ubuntu-com-Management-https-l_1775475377113.txt | 200 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted--Strictly-confined-Kubernetes-makes-edge-and-IoT-secure_1775475245259.txt |  52 +++++++++++++++++++++
+ attached_assets/Pasted-pm2-delete-all-pm2-start-ecosystem-config-js-env-produc_1775476691929.txt |  59 +++++++++++++++++++++++
+ attached_assets/Screenshot_2026-04-06_160348_1775473436902.png                                   | Bin 0 -> 111120 bytes
+ attached_assets/Screenshot_2026-04-06_163842_1775475531304.png                                   | Bin 0 -> 72715 bytes
+ attached_assets/Screenshot_2026-04-06_164005_1775475614317.png                                   | Bin 0 -> 116585 bytes
+ attached_assets/Screenshot_2026-04-06_164614_1775475983747.png                                   | Bin 0 -> 66901 bytes
+ attached_assets/Screenshot_2026-04-07_111516_1775542543704.png                                   | Bin 0 -> 60692 bytes
+ attached_assets/Screenshot_2026-04-07_111534_1775542543704.png                                   | Bin 0 -> 97176 bytes
+ backend/prisma/schema.prisma                                                                     |  72 +++++++++++++++-------------
+ backend/src/controllers/accountingReportController.js                                            |  25 +++++++---
+ backend/src/controllers/backupController.js                                                      |  37 ++++++++-------
+ backend/src/controllers/employeeController.js                                                    |  83 ++++++++++++++++++++++++++++-----
+ backend/src/controllers/invoiceController.js                                                     |   6 ++-
+ backend/src/routes/employeeRoutes.js                                                             |   2 +
+ next-env.d.ts                                                                                    |   2 +-
+ src/app/accounting/employees/page.tsx                                                            | 210 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------
+ src/app/accounting/invoices/page.tsx                                                             | 117 ++++++++++++++++++++++++++++++----------------
+ src/app/accounting/reports/page.tsx                                                              |  83 +++++++++++++++++++++------------
+ 19 files changed, 765 insertions(+), 183 deletions(-)
+ create mode 100644 attached_assets/Pasted--Documentation-https-help-ubuntu-com-Management-https-l_1775475377113.txt
+ create mode 100644 attached_assets/Pasted--Strictly-confined-Kubernetes-makes-edge-and-IoT-secure_1775475245259.txt
+ create mode 100644 attached_assets/Pasted-pm2-delete-all-pm2-start-ecosystem-config-js-env-produc_1775476691929.txt
+ create mode 100644 attached_assets/Screenshot_2026-04-06_160348_1775473436902.png
+ create mode 100644 attached_assets/Screenshot_2026-04-06_163842_1775475531304.png
+ create mode 100644 attached_assets/Screenshot_2026-04-06_164005_1775475614317.png
+ create mode 100644 attached_assets/Screenshot_2026-04-06_164614_1775475983747.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_111516_1775542543704.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_111534_1775542543704.png
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# npm install
+Command 'npm' not found, but can be installed with:
+apt install npm
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# 
