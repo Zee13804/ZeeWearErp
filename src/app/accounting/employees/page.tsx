@@ -17,7 +17,8 @@ interface Employee { id: number; name: string; designation?: string; phone?: str
 interface Advance { id: number; employee: { name: string }; amount: number; repaid: number; reason?: string; advanceDate: string; accountId?: number; }
 interface Salary { id: number; employee: { name: string; designation?: string }; month: number; year: number; baseSalary: number; advanceDeducted: number; absenceDays: number; absenceDeduction: number; invoiceDeducted: number; netSalary: number; isPaid: boolean; paidAt?: string; accountId?: number; note?: string; }
 interface Labour { id: number; workerName: string; description?: string; amount: number; weekStart?: string; weekEnd?: string; paymentDate: string; accountId?: number; }
-interface InvoiceBalance { hasLinkedCustomer: boolean; customerId?: number; customerName?: string; totalInvoiced?: number; totalPaid?: number; outstanding?: number; }
+interface PendingInvoice { id: number; invoiceNo: string; invoiceDate: string; totalAmount: number; paidAmount: number; pendingAmount: number; }
+interface InvoiceBalance { hasLinkedCustomer: boolean; customerId?: number; customerName?: string; totalInvoiced?: number; totalPaid?: number; outstanding?: number; pendingInvoices?: PendingInvoice[]; }
 
 type Tab = "employees" | "advances" | "salaries" | "labour";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -544,20 +545,35 @@ export default function EmployeesPage() {
 
           {/* Invoice Deduction */}
           {loadingBalance && <div className="text-xs text-muted-foreground">Loading invoice balance...</div>}
-          {invoiceBalance?.hasLinkedCustomer && (
+          {invoiceBalance?.hasLinkedCustomer && (invoiceBalance.outstanding || 0) <= 0 && (
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">
+              ✓ {invoiceBalance.customerName} — koi pending bill nahi (sab paid)
+            </div>
+          )}
+          {invoiceBalance?.hasLinkedCustomer && (invoiceBalance.outstanding || 0) > 0 && (
             <div className="border border-purple-200 dark:border-purple-900 rounded-lg p-3 space-y-2 bg-purple-50/50 dark:bg-purple-950/20">
-              <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">Invoice Deduction — {invoiceBalance.customerName}</p>
-              <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-                <div><p className="text-muted-foreground">Total Invoiced</p><p className="font-semibold">Rs {fmt(invoiceBalance.totalInvoiced || 0)}</p></div>
+              <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">Pending Bills — {invoiceBalance.customerName}</p>
+              {invoiceBalance.pendingInvoices && invoiceBalance.pendingInvoices.length > 0 && (
+                <div className="space-y-1">
+                  {invoiceBalance.pendingInvoices.map(inv => (
+                    <div key={inv.id} className="flex items-center justify-between text-xs bg-purple-100/60 dark:bg-purple-900/30 rounded px-2 py-1">
+                      <span className="text-purple-800 dark:text-purple-300 font-medium">{inv.invoiceNo}</span>
+                      <span className="text-muted-foreground">{new Date(inv.invoiceDate).toLocaleDateString("en-PK")}</span>
+                      <span className="text-red-600 font-semibold">Rs {fmt(inv.pendingAmount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-purple-200 dark:border-purple-800">
                 <div><p className="text-muted-foreground">Total Paid</p><p className="font-semibold text-emerald-600">Rs {fmt(invoiceBalance.totalPaid || 0)}</p></div>
-                <div><p className="text-muted-foreground">Outstanding</p><p className="font-semibold text-red-600">Rs {fmt(invoiceBalance.outstanding || 0)}</p></div>
+                <div><p className="text-muted-foreground">Total Pending</p><p className="font-semibold text-red-600">Rs {fmt(invoiceBalance.outstanding || 0)}</p></div>
               </div>
-              <FormField label="Deduct from Invoice (Rs)">
+              <FormField label="Salary se deduct karein (Rs)">
                 <Input type="number" value={salaryForm.invoiceDeducted} onChange={e => setSalaryForm({ ...salaryForm, invoiceDeducted: e.target.value })} placeholder="0" min="0" max={invoiceBalance.outstanding} step="any" />
               </FormField>
               {parseFloat(salaryForm.invoiceDeducted) > 0 && (
                 <p className="text-xs text-purple-700 dark:text-purple-400">
-                  Remaining after deduction: <span className="font-bold">Rs {fmt((invoiceBalance.outstanding || 0) - (parseFloat(salaryForm.invoiceDeducted) || 0))}</span>
+                  Deduction ke baad remaining: <span className="font-bold">Rs {fmt((invoiceBalance.outstanding || 0) - (parseFloat(salaryForm.invoiceDeducted) || 0))}</span>
                 </p>
               )}
             </div>

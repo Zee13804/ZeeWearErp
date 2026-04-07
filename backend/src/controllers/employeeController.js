@@ -275,12 +275,24 @@ const getEmployeeInvoiceBalance = async (req, res) => {
 
     const invoices = await prisma.invoice.findMany({
       where: { customerId: employee.linkedCustomerId },
-      select: { totalAmount: true, paidAmount: true },
+      select: { id: true, invoiceNo: true, invoiceDate: true, totalAmount: true, paidAmount: true, status: true },
+      orderBy: { invoiceDate: 'asc' },
     });
 
     const totalInvoiced = invoices.reduce((s, inv) => s + inv.totalAmount, 0);
     const totalPaid = invoices.reduce((s, inv) => s + inv.paidAmount, 0);
     const outstanding = totalInvoiced - totalPaid;
+
+    const pendingInvoices = invoices
+      .filter(inv => inv.totalAmount - inv.paidAmount > 0)
+      .map(inv => ({
+        id: inv.id,
+        invoiceNo: inv.invoiceNo,
+        invoiceDate: inv.invoiceDate,
+        totalAmount: inv.totalAmount,
+        paidAmount: inv.paidAmount,
+        pendingAmount: inv.totalAmount - inv.paidAmount,
+      }));
 
     return res.json({
       hasLinkedCustomer: true,
@@ -289,6 +301,7 @@ const getEmployeeInvoiceBalance = async (req, res) => {
       totalInvoiced,
       totalPaid,
       outstanding,
+      pendingInvoices,
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch invoice balance', details: err.message });
