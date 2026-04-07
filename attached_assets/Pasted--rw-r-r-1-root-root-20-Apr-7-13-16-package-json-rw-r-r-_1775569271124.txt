@@ -1,0 +1,214 @@
+-rw-r--r--  1 root root    20 Apr  7 13:16 package.json
+-rw-r--r--  1 root root 14059 Apr  7 13:17 prerender-manifest.json
+-rw-r--r--  1 root root  9558 Apr  7 13:17 required-server-files.js
+-rw-r--r--  1 root root  9529 Apr  7 13:17 required-server-files.json
+-rw-r--r--  1 root root  5114 Apr  7 13:17 routes-manifest.json
+drwxr-xr-x  5 root root  4096 Apr  7 13:17 server
+drwxr-xr-x  4 root root  4096 Apr  7 13:16 static
+-rw-r--r--  1 root root 12244 Apr  7 13:17 trace
+-rw-r--r--  1 root root  1198 Apr  7 13:17 trace-build
+-rw-r--r--  1 root root     0 Apr  7 13:16 turbopack
+drwxr-xr-x  2 root root  4096 Apr  7 13:16 types
+drwxr-xr-x   9 root root   4096 Apr  7 13:17 .next
+-rw-r--r--   1 root root    251 Apr  7 13:17 next-env.d.ts
+-rw-r--r--   1 root root    439 Apr  6 11:32 next.config.ts
+-rw-r--r--   1 root root 118268 Apr  6 11:32 tsconfig.tsbuildinfo
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# cat /www/server/panel/vhost/nginx/zeewear.devoriatech.com.conf 2>/dev/null || cat /etc/nginx/sites-enabled/zeewear* 2>/dev/null || cat /etc/nginx/sites-enabled/default
+cat: /etc/nginx/sites-enabled/default: No such file or directory
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# find /www/server/panel/vhost/nginx/ -name "*.conf" 2>/dev/null | head -10 && find /etc/nginx/ -name "*.conf" 2>/dev/null | grep -v default | head -10
+/www/server/panel/vhost/nginx/extension/mehryam_erp/site_total.conf
+/www/server/panel/vhost/nginx/phpfpm_status.conf
+/www/server/panel/vhost/nginx/0.fastcgi_cache.conf
+/www/server/panel/vhost/nginx/0.site_total_log_format.conf
+/www/server/panel/vhost/nginx/node_mehryam_erp.conf
+/www/server/panel/vhost/nginx/0.websocket.conf
+/www/server/panel/vhost/nginx/0.default.conf
+/www/server/panel/vhost/nginx/well-known/mehryam_erp.conf
+/www/server/panel/vhost/nginx/waf2monitor_data.conf
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# cat /www/server/panel/vhost/nginx/node_mehryam_erp.conf
+server
+{
+    listen 80;
+    listen 443 ssl;
+    server_name mehryam.cloud;
+    index index.html index.htm default.htm default.html;
+    # root /www/wwwroot/zeewear.devoriatech.com;
+    
+    #SSL-START SSL related configuration
+    #error_page 404/404.html;
+    #HTTP_TO_HTTPS_START
+    if ($server_port !~ 443){
+        rewrite ^(/.*)$ https://$host$1 permanent;
+    }
+    #HTTP_TO_HTTPS_END
+    ssl_certificate    /www/server/panel/vhost/cert/mehryam_erp/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/mehryam_erp/privkey.pem;
+    ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:EECDH+3DES:RSA+3DES:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000";
+    error_page 497  https://$host$request_uri;
+    #SSL-END
+    
+    #ERROR-PAGE-START  Error page related configuration
+    #error_page 404 /404.html;
+    #error_page 502 /502.html;
+    #ERROR-PAGE-END
+    
+    
+    #REWRITE-START Pseudo-static related configuration
+    include /www/server/panel/vhost/rewrite/node_mehryam_erp.conf;
+    #REWRITE-END
+    
+    #Files or directories forbidden to access
+    location ~ ^/(\.user.ini|\.htaccess|\.git|\.svn|\.project|LICENSE|README.md|package.json|package-lock.json|\.env|node_modules) {
+        return 404;
+    }
+    
+    #One-click application for SSL certificate verification directory related settings
+    location /.well-known/ {
+        root  /www/wwwroot/zeewear.devoriatech.com;
+    }
+
+    # HTTP reverse proxy related settings begin. You can make proxy cache settings here.>>>
+    #location ~ /purge(/.*) {
+    #    proxy_cache_purge cache_one $host$request_uri$is_args$args;
+    #}
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header REMOTE-HOST $remote_addr;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header X-Cache $upstream_cache_status;
+
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 30s;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    # End of HTTP reverse proxy related settings <<<
+    
+    access_log  /www/wwwlogs/mehryam_erp.log;
+    error_log  /www/wwwlogs/mehryam_erp.error.log;
+}root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# cat /www/server/panel/vhost/nginx/node_mehryam_erp.conf
+server
+{
+    listen 80;
+    listen 443 ssl;
+    server_name mehryam.cloud;
+    index index.html index.htm default.htm default.html;
+    # root /www/wwwroot/zeewear.devoriatech.com;
+    
+    #SSL-START SSL related configuration
+    #error_page 404/404.html;
+    #HTTP_TO_HTTPS_START
+    if ($server_port !~ 443){
+        rewrite ^(/.*)$ https://$host$1 permanent;
+    }
+    #HTTP_TO_HTTPS_END
+    ssl_certificate    /www/server/panel/vhost/cert/mehryam_erp/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/mehryam_erp/privkey.pem;
+    ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:EECDH+3DES:RSA+3DES:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000";
+    error_page 497  https://$host$request_uri;
+    #SSL-END
+    
+    #ERROR-PAGE-START  Error page related configuration
+    #error_page 404 /404.html;
+    #error_page 502 /502.html;
+    #ERROR-PAGE-END
+    
+    
+    #REWRITE-START Pseudo-static related configuration
+    include /www/server/panel/vhost/rewrite/node_mehryam_erp.conf;
+    #REWRITE-END
+    
+    #Files or directories forbidden to access
+    location ~ ^/(\.user.ini|\.htaccess|\.git|\.svn|\.project|LICENSE|README.md|package.json|package-lock.json|\.env|node_modules) {
+        return 404;
+    }
+    
+    #One-click application for SSL certificate verification directory related settings
+    location /.well-known/ {
+        root  /www/wwwroot/zeewear.devoriatech.com;
+    }
+
+    # HTTP reverse proxy related settings begin. You can make proxy cache settings here.>>>
+    #location ~ /purge(/.*) {
+    #    proxy_cache_purge cache_one $host$request_uri$is_args$args;
+    #}
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header REMOTE-HOST $remote_addr;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header X-Cache $upstream_cache_status;
+
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 30s;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    # End of HTTP reverse proxy related settings <<<
+    
+    access_log  /www/wwwlogs/mehryam_erp.log;
+    error_log  /www/wwwlogs/mehryam_erp.error.log;
+}root@srv1562853:/www/wwwroot/zeewear.devoriatech.com#pkill -f "node server.js" 2>/dev/null; sleep 1; NODE_ENV=production nohup node server.js >> /tmp/zeewear.log 2>&1 &&
+[1] 51164
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# tail -5 /tmp/zeewear.log
+> Server ready on http://0.0.0.0:5000
+[Scheduler] Daily report scheduled at 18:00 (PKT)
+nohup: ignoring input
+nohup: failed to run command 'node': No such file or directory
+[1]+  Exit 127                NODE_ENV=production nohup node server.js >> /tmp/zeewear.log 2>&1
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# pkill -f "node server.js" 2>/dev/null; sleep 1; NODE_ENV=production nohup node server.js >> /tmp/zeewear.log 2>&1 &
+[1] 51182
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# git pull origin main
+remote: Enumerating objects: 29, done.
+remote: Counting objects: 100% (29/29), done.
+remote: Compressing objects: 100% (9/9), done.
+remote: Total 26 (delta 17), reused 26 (delta 17), pack-reused 0 (from 0)
+Unpacking objects: 100% (26/26), 254.47 KiB | 5.09 MiB/s, done.
+From https://github.com/Zee13804/ZeeWearErp
+ * branch            main       -> FETCH_HEAD
+   56986af..2008f7d  main       -> origin/main
+Updating 56986af..2008f7d
+Fast-forward
+ attached_assets/Pasted-INSTALLATION-GUIDE-txt-ecosystem-config-js-logs-nginx-c_1775567784432.txt |  58 ++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-Unpacking-objects-100-92-92-498-99-KiB-2-46-MiB-s-done-_1775567649858.txt |  38 ++++++++++++++++++++++
+ attached_assets/Pasted-eate-mode-100644-attached-assets-Screenshot-2026-04-06-_1775567843664.txt | 142 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Screenshot_2026-04-07_183010_1775568620998.png                                   | Bin 0 -> 75582 bytes
+ attached_assets/Screenshot_2026-04-07_183607_1775569029866.png                                   | Bin 0 -> 51113 bytes
+ attached_assets/Screenshot_2026-04-07_183624_1775569029866.png                                   | Bin 0 -> 42534 bytes
+ attached_assets/Screenshot_2026-04-07_183641_1775569029866.png                                   | Bin 0 -> 37428 bytes
+ attached_assets/Screenshot_2026-04-07_183656_1775569029865.png                                   | Bin 0 -> 75780 bytes
+ vps-update.sh                                                                                    |   2 +-
+ 9 files changed, 239 insertions(+), 1 deletion(-)
+ create mode 100644 attached_assets/Pasted-INSTALLATION-GUIDE-txt-ecosystem-config-js-logs-nginx-c_1775567784432.txt
+ create mode 100644 attached_assets/Pasted-Unpacking-objects-100-92-92-498-99-KiB-2-46-MiB-s-done-_1775567649858.txt
+ create mode 100644 attached_assets/Pasted-eate-mode-100644-attached-assets-Screenshot-2026-04-06-_1775567843664.txt
+ create mode 100644 attached_assets/Screenshot_2026-04-07_183010_1775568620998.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_183607_1775569029866.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_183624_1775569029866.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_183641_1775569029866.png
+ create mode 100644 attached_assets/Screenshot_2026-04-07_183656_1775569029865.png
+[1]+  Exit 127                NODE_ENV=production nohup node server.js >> /tmp/zeewear.log 2>&1
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# 
