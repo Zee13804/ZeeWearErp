@@ -36,7 +36,7 @@ const getEmployees = async (req, res) => {
 
 const createEmployee = async (req, res) => {
   try {
-    const { name, designation, phone, monthlySalary, joinDate } = req.body;
+    const { name, designation, phone, monthlySalary, joinDate, linkedCustomerId } = req.body;
     if (!name) return res.status(400).json({ error: 'Employee name is required' });
 
     const employee = await prisma.employee.create({
@@ -46,6 +46,7 @@ const createEmployee = async (req, res) => {
         phone: phone || null,
         monthlySalary: monthlySalary ? parseFloat(monthlySalary) : 0,
         joinDate: joinDate ? new Date(joinDate) : null,
+        linkedCustomerId: linkedCustomerId ? parseInt(linkedCustomerId) : null,
       },
     });
     return res.status(201).json({ message: 'Employee created', employee });
@@ -57,7 +58,7 @@ const createEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, designation, phone, monthlySalary, joinDate } = req.body;
+    const { name, designation, phone, monthlySalary, joinDate, linkedCustomerId } = req.body;
 
     const employee = await prisma.employee.update({
       where: { id: parseInt(id) },
@@ -67,6 +68,7 @@ const updateEmployee = async (req, res) => {
         ...(phone !== undefined && { phone: phone || null }),
         ...(monthlySalary !== undefined && { monthlySalary: parseFloat(monthlySalary) }),
         ...(joinDate !== undefined && { joinDate: joinDate ? new Date(joinDate) : null }),
+        ...(linkedCustomerId !== undefined && { linkedCustomerId: linkedCustomerId ? parseInt(linkedCustomerId) : null }),
       },
     });
     return res.json({ message: 'Employee updated', employee });
@@ -181,7 +183,7 @@ const getSalaries = async (req, res) => {
 
 const createSalary = async (req, res) => {
   try {
-    const { employeeId, month, year, baseSalary, advanceDeducted, note, accountId, markPaid } = req.body;
+    const { employeeId, month, year, baseSalary, advanceDeducted, absenceDays, invoiceDeducted, note, accountId, markPaid } = req.body;
     if (!employeeId || !month || !year || !baseSalary)
       return res.status(400).json({ error: 'employeeId, month, year and baseSalary are required' });
     if (!accountId) return res.status(400).json({ error: 'accountId is required — every salary record must be linked to an account' });
@@ -189,7 +191,10 @@ const createSalary = async (req, res) => {
     const eid = parseInt(employeeId);
     const base = parseFloat(baseSalary);
     const deducted = advanceDeducted ? parseFloat(advanceDeducted) : 0;
-    const net = base - deducted;
+    const absDays = absenceDays ? parseInt(absenceDays) : 0;
+    const absDeduction = absDays > 0 ? parseFloat(((base / 30) * absDays).toFixed(2)) : 0;
+    const invDeducted = invoiceDeducted ? parseFloat(invoiceDeducted) : 0;
+    const net = base - deducted - absDeduction - invDeducted;
     const paid = markPaid === true || markPaid === 'true';
 
     const salary = await prisma.$transaction(async (tx) => {
@@ -200,6 +205,9 @@ const createSalary = async (req, res) => {
           year: parseInt(year),
           baseSalary: base,
           advanceDeducted: deducted,
+          absenceDays: absDays,
+          absenceDeduction: absDeduction,
+          invoiceDeducted: invDeducted,
           netSalary: net,
           note: note || null,
           isPaid: paid,
@@ -235,6 +243,38 @@ const createSalary = async (req, res) => {
   } catch (err) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Salary record for this month already exists' });
     return res.status(500).json({ error: 'Failed to create salary', details: err.message });
+  }
+};
+
+const getEmployeeInvoiceBalance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employee = await prisma.employee.findUnique({
+      where: { id: parseInt(id) },
+      include: { linkedCustomer: { select: { id: true, name: true } } },
+    });
+    if (!employee) return res.status(404).json({ error: 'Employee not found' });
+    if (!employee.linkedCustomerId) return res.json({ hasLinkedCustomer: false });
+
+    const invoices = await prisma.invoice.findMany({
+      where: { customerId: employee.linkedCustomerId },
+      select: { totalAmount: true, paidAmount: true },
+    });
+
+    const totalInvoiced = invoices.reduce((s, inv) => s + inv.totalAmount, 0);
+    const totalPaid = invoices.reduce((s, inv) => s + inv.paidAmount, 0);
+    const outstanding = totalInvoiced - totalPaid;
+
+    return res.json({
+      hasLinkedCustomer: true,
+      customerId: employee.linkedCustomerId,
+      customerName: employee.linkedCustomer?.name || '',
+      totalInvoiced,
+      totalPaid,
+      outstanding,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch invoice balance', details: err.message });
   }
 };
 
@@ -331,4 +371,5 @@ module.exports = {
   getAdvances, createAdvance, repayAdvance, deleteAdvance,
   getSalaries, createSalary, markSalaryPaid, deleteSalary,
   getLabourPayments, createLabourPayment, deleteLabourPayment,
+  getEmployeeInvoiceBalance,
 };

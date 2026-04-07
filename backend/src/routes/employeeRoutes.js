@@ -6,6 +6,7 @@ const {
   getAdvances, createAdvance, repayAdvance, deleteAdvance,
   getSalaries, createSalary, markSalaryPaid, deleteSalary,
   getLabourPayments, createLabourPayment, deleteLabourPayment,
+  getEmployeeInvoiceBalance,
 } = require('../controllers/employeeController');
 
 const adminAuth = [authenticate, authorize('admin')];
@@ -15,6 +16,7 @@ router.get('/', ...accAuth, getEmployees);
 router.post('/', ...adminAuth, createEmployee);
 router.put('/:id', ...adminAuth, updateEmployee);
 router.delete('/:id', ...adminAuth, deleteEmployee);
+router.get('/:id/invoice-balance', ...accAuth, getEmployeeInvoiceBalance);
 
 router.get('/advances', ...accAuth, getAdvances);
 router.post('/advances', ...accAuth, createAdvance);

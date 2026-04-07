@@ -12,10 +12,12 @@ import { isAdmin, isAccountant } from "@/lib/auth";
 import { Plus, Trash2, Loader2, CheckCircle, Wallet, Edit2 } from "lucide-react";
 
 interface Account { id: number; name: string; type: string; balance: number; }
-interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; }
+interface Customer { id: number; name: string; }
+interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; linkedCustomerId?: number; }
 interface Advance { id: number; employee: { name: string }; amount: number; repaid: number; reason?: string; advanceDate: string; accountId?: number; }
-interface Salary { id: number; employee: { name: string; designation?: string }; month: number; year: number; baseSalary: number; advanceDeducted: number; netSalary: number; isPaid: boolean; paidAt?: string; accountId?: number; note?: string; }
+interface Salary { id: number; employee: { name: string; designation?: string }; month: number; year: number; baseSalary: number; advanceDeducted: number; absenceDays: number; absenceDeduction: number; invoiceDeducted: number; netSalary: number; isPaid: boolean; paidAt?: string; accountId?: number; note?: string; }
 interface Labour { id: number; workerName: string; description?: string; amount: number; weekStart?: string; weekEnd?: string; paymentDate: string; accountId?: number; }
+interface InvoiceBalance { hasLinkedCustomer: boolean; customerId?: number; customerName?: string; totalInvoiced?: number; totalPaid?: number; outstanding?: number; }
 
 type Tab = "employees" | "advances" | "salaries" | "labour";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -28,16 +30,19 @@ export default function EmployeesPage() {
   const canManageEmployees = isAdmin();
   const [tab, setTab] = useState<Tab>("employees");
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [labour, setLabour] = useState<Labour[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [invoiceBalance, setInvoiceBalance] = useState<InvoiceBalance | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   const [showEmpForm, setShowEmpForm] = useState(false);
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "" });
+  const [editForm, setEditForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [showSalaryForm, setShowSalaryForm] = useState(false);
   const [showLabourForm, setShowLabourForm] = useState(false);
@@ -47,12 +52,12 @@ export default function EmployeesPage() {
   const [markPaidAccountId, setMarkPaidAccountId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; type: string; name: string } | null>(null);
 
-  const [empForm, setEmpForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "" });
+  const [empForm, setEmpForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
   const [advanceForm, setAdvanceForm] = useState({ employeeId: "", amount: "", reason: "", advanceDate: "", accountId: "" });
   const [salaryForm, setSalaryForm] = useState({
     employeeId: "", month: String(new Date().getMonth() + 1),
     year: String(new Date().getFullYear()), baseSalary: "",
-    advanceDeducted: "0", note: "", accountId: "", markPaid: false,
+    advanceDeducted: "0", absenceDays: "0", invoiceDeducted: "0", note: "", accountId: "", markPaid: false,
   });
   const [labourForm, setLabourForm] = useState({ workerName: "", description: "", amount: "", weekStart: "", weekEnd: "", paymentDate: "", accountId: "" });
 
@@ -80,8 +85,20 @@ export default function EmployeesPage() {
       setAdvances(advRes.advances || []);
       setSalaries(salRes.salaries || []);
       setLabour(labRes.payments || []);
+      const custResult = await apiGet("/accounting/invoices/customers").catch(() => ({ customers: [] }));
+      setCustomers(custResult.customers || []);
     } catch { showToast("Failed to load", "error"); }
     finally { setLoading(false); }
+  };
+
+  const fetchInvoiceBalance = async (employeeId: string) => {
+    if (!employeeId) { setInvoiceBalance(null); return; }
+    setLoadingBalance(true);
+    try {
+      const res = await apiGet(`/accounting/employees/${employeeId}/invoice-balance`);
+      setInvoiceBalance(res);
+    } catch { setInvoiceBalance(null); }
+    finally { setLoadingBalance(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -91,10 +108,10 @@ export default function EmployeesPage() {
     if (!empForm.name) { showToast("Name required", "error"); return; }
     setSaving(true);
     try {
-      await apiPost("/accounting/employees", empForm);
+      await apiPost("/accounting/employees", { ...empForm, linkedCustomerId: empForm.linkedCustomerId || null });
       showToast("Employee added", "success");
       setShowEmpForm(false);
-      setEmpForm({ name: "", designation: "", phone: "", monthlySalary: "" });
+      setEmpForm({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -105,7 +122,7 @@ export default function EmployeesPage() {
     if (!editEmp || !editForm.name) { showToast("Name required", "error"); return; }
     setSaving(true);
     try {
-      await apiPut(`/accounting/employees/${editEmp.id}`, editForm);
+      await apiPut(`/accounting/employees/${editEmp.id}`, { ...editForm, linkedCustomerId: editForm.linkedCustomerId || null });
       showToast("Employee updated", "success");
       setEditEmp(null);
       load();
@@ -137,10 +154,13 @@ export default function EmployeesPage() {
       await apiPost("/accounting/employees/salaries", {
         ...salaryForm,
         baseSalary: parseFloat(salaryForm.baseSalary) || 0,
+        absenceDays: parseInt(salaryForm.absenceDays) || 0,
+        invoiceDeducted: parseFloat(salaryForm.invoiceDeducted) || 0,
       });
       showToast("Salary record created", "success");
       setShowSalaryForm(false);
-      setSalaryForm({ employeeId: "", month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()), baseSalary: "", advanceDeducted: "0", note: "", accountId: "", markPaid: false });
+      setInvoiceBalance(null);
+      setSalaryForm({ employeeId: "", month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()), baseSalary: "", advanceDeducted: "0", absenceDays: "0", invoiceDeducted: "0", note: "", accountId: "", markPaid: false });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -249,7 +269,7 @@ export default function EmployeesPage() {
                         {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
                       </div>
                       <div className="flex items-center gap-1">
-                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary) }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
+                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary), linkedCustomerId: emp.linkedCustomerId ? String(emp.linkedCustomerId) : "" }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
                         {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </div>
                     </div>
@@ -334,7 +354,9 @@ export default function EmployeesPage() {
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Period</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
                         <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base</th>
-                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deducted</th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">Adv. Cut</th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">Absent</th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">Invoice Cut</th>
                         <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Paid From</th>
                         <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
@@ -352,7 +374,9 @@ export default function EmployeesPage() {
                               {s.employee.designation && <p className="text-xs text-muted-foreground">{s.employee.designation}</p>}
                             </td>
                             <td className="px-4 py-3 text-right">Rs {fmt(s.baseSalary)}</td>
-                            <td className="px-4 py-3 text-right text-red-500">Rs {fmt(s.advanceDeducted)}</td>
+                            <td className="px-4 py-3 text-right text-red-500">{s.advanceDeducted > 0 ? `–Rs ${fmt(s.advanceDeducted)}` : "—"}</td>
+                            <td className="px-4 py-3 text-right text-orange-500">{s.absenceDays > 0 ? <span title={`${s.absenceDays} days`}>–Rs {fmt(s.absenceDeduction)}</span> : "—"}</td>
+                            <td className="px-4 py-3 text-right text-purple-600">{s.invoiceDeducted > 0 ? `–Rs ${fmt(s.invoiceDeducted)}` : "—"}</td>
                             <td className="px-4 py-3 text-right font-bold">Rs {fmt(s.netSalary)}</td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">{acc ? <span className="flex items-center gap-1"><Wallet className="w-3 h-3" />{acc.name}</span> : "—"}</td>
                             <td className="px-4 py-3 text-center">
@@ -431,6 +455,9 @@ export default function EmployeesPage() {
             <FormField label="Phone"><Input value={empForm.phone} onChange={e => setEmpForm({ ...empForm, phone: e.target.value })} placeholder="Phone number" /></FormField>
           </div>
           <FormField label="Monthly Salary (Rs)"><Input type="number" value={empForm.monthlySalary} onChange={e => setEmpForm({ ...empForm, monthlySalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
+          <FormField label="Linked Customer (optional)">
+            <Select value={empForm.linkedCustomerId} onChange={val => setEmpForm({ ...empForm, linkedCustomerId: val })} options={[{ label: "None", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
+          </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setShowEmpForm(false)} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Add Employee"}</Button>
@@ -447,6 +474,9 @@ export default function EmployeesPage() {
             <FormField label="Phone"><Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone number" /></FormField>
           </div>
           <FormField label="Monthly Salary (Rs)"><Input type="number" value={editForm.monthlySalary} onChange={e => setEditForm({ ...editForm, monthlySalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
+          <FormField label="Linked Customer (optional)">
+            <Select value={editForm.linkedCustomerId} onChange={val => setEditForm({ ...editForm, linkedCustomerId: val })} options={[{ label: "None", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
+          </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setEditEmp(null)} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Update Employee"}</Button>
@@ -474,12 +504,13 @@ export default function EmployeesPage() {
       </Dialog>
 
       {/* Salary Record */}
-      <Dialog open={showSalaryForm} onClose={() => setShowSalaryForm(false)} title="Salary Record" description="Create a monthly salary record">
+      <Dialog open={showSalaryForm} onClose={() => { setShowSalaryForm(false); setInvoiceBalance(null); }} title="Salary Record" description="Create a monthly salary record">
         <form onSubmit={handleSalarySubmit} className="space-y-3">
           <FormField label="Employee" required>
             <Select value={salaryForm.employeeId} onChange={val => {
               const emp = employees.find(em => em.id === parseInt(val));
-              setSalaryForm({ ...salaryForm, employeeId: val, baseSalary: emp ? String(emp.monthlySalary) : salaryForm.baseSalary, advanceDeducted: emp ? String(emp.advanceBalance) : "0" });
+              setSalaryForm({ ...salaryForm, employeeId: val, baseSalary: emp ? String(emp.monthlySalary) : salaryForm.baseSalary, advanceDeducted: emp ? String(emp.advanceBalance) : "0", absenceDays: "0", invoiceDeducted: "0" });
+              fetchInvoiceBalance(val);
             }} options={[{ label: "Select employee", value: "" }, ...employees.map(e => ({ label: `${e.name} (Rs ${fmt(e.monthlySalary)}/mo)`, value: String(e.id) }))]} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
@@ -492,9 +523,60 @@ export default function EmployeesPage() {
             <FormField label="Base Salary" required><Input type="number" value={salaryForm.baseSalary} onChange={e => setSalaryForm({ ...salaryForm, baseSalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
             <FormField label="Advance Deducted"><Input type="number" value={salaryForm.advanceDeducted} onChange={e => setSalaryForm({ ...salaryForm, advanceDeducted: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
           </div>
+
+          {/* Absent Days */}
+          <div className="border border-border rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Absent Days Deduction</p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <FormField label="Absent Days">
+                  <Input type="number" value={salaryForm.absenceDays} onChange={e => setSalaryForm({ ...salaryForm, absenceDays: e.target.value })} placeholder="0" min="0" max="31" step="1" />
+                </FormField>
+              </div>
+              {salaryForm.baseSalary && parseInt(salaryForm.absenceDays) > 0 && (
+                <div className="text-right text-sm pt-4">
+                  <p className="text-muted-foreground text-xs">Daily Rate: Rs {fmt((parseFloat(salaryForm.baseSalary) || 0) / 30)}</p>
+                  <p className="text-orange-600 font-semibold">–Rs {fmt(((parseFloat(salaryForm.baseSalary) || 0) / 30) * parseInt(salaryForm.absenceDays))}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Invoice Deduction */}
+          {loadingBalance && <div className="text-xs text-muted-foreground">Loading invoice balance...</div>}
+          {invoiceBalance?.hasLinkedCustomer && (
+            <div className="border border-purple-200 dark:border-purple-900 rounded-lg p-3 space-y-2 bg-purple-50/50 dark:bg-purple-950/20">
+              <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">Invoice Deduction — {invoiceBalance.customerName}</p>
+              <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                <div><p className="text-muted-foreground">Total Invoiced</p><p className="font-semibold">Rs {fmt(invoiceBalance.totalInvoiced || 0)}</p></div>
+                <div><p className="text-muted-foreground">Total Paid</p><p className="font-semibold text-emerald-600">Rs {fmt(invoiceBalance.totalPaid || 0)}</p></div>
+                <div><p className="text-muted-foreground">Outstanding</p><p className="font-semibold text-red-600">Rs {fmt(invoiceBalance.outstanding || 0)}</p></div>
+              </div>
+              <FormField label="Deduct from Invoice (Rs)">
+                <Input type="number" value={salaryForm.invoiceDeducted} onChange={e => setSalaryForm({ ...salaryForm, invoiceDeducted: e.target.value })} placeholder="0" min="0" max={invoiceBalance.outstanding} step="any" />
+              </FormField>
+              {parseFloat(salaryForm.invoiceDeducted) > 0 && (
+                <p className="text-xs text-purple-700 dark:text-purple-400">
+                  Remaining after deduction: <span className="font-bold">Rs {fmt((invoiceBalance.outstanding || 0) - (parseFloat(salaryForm.invoiceDeducted) || 0))}</span>
+                </p>
+              )}
+            </div>
+          )}
+
           {salaryForm.baseSalary && (
-            <div className="p-3 rounded-lg bg-muted/50 text-sm">
-              Net Salary: <span className="font-bold text-foreground">Rs {fmt((parseFloat(salaryForm.baseSalary) || 0) - (parseFloat(salaryForm.advanceDeducted) || 0))}</span>
+            <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+              {parseInt(salaryForm.absenceDays) > 0 && (
+                <p className="text-xs text-muted-foreground">Absence: –Rs {fmt(((parseFloat(salaryForm.baseSalary) || 0) / 30) * parseInt(salaryForm.absenceDays))}</p>
+              )}
+              {parseFloat(salaryForm.invoiceDeducted) > 0 && (
+                <p className="text-xs text-muted-foreground">Invoice Cut: –Rs {fmt(parseFloat(salaryForm.invoiceDeducted))}</p>
+              )}
+              <p>Net Salary: <span className="font-bold text-foreground">Rs {fmt(
+                (parseFloat(salaryForm.baseSalary) || 0)
+                - (parseFloat(salaryForm.advanceDeducted) || 0)
+                - (parseInt(salaryForm.absenceDays) > 0 ? ((parseFloat(salaryForm.baseSalary) || 0) / 30) * parseInt(salaryForm.absenceDays) : 0)
+                - (parseFloat(salaryForm.invoiceDeducted) || 0)
+              )}</span></p>
             </div>
           )}
           <FormField label="Pay From Account" required>
@@ -506,7 +588,7 @@ export default function EmployeesPage() {
             Mark as Paid immediately
           </label>
           <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowSalaryForm(false)} className="cursor-pointer">Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowSalaryForm(false); setInvoiceBalance(null); }} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Create"}</Button>
           </div>
         </form>

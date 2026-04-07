@@ -247,15 +247,16 @@ model SupplierPayment {
 }
 
 model Customer {
-  id        Int       @id @default(autoincrement())
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  note      String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  invoices  Invoice[]
+  id              Int        @id @default(autoincrement())
+  name            String
+  phone           String?
+  email           String?
+  address         String?
+  note            String?
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  invoices        Invoice[]
+  linkedEmployees Employee[]
 }
 
 model Invoice {
@@ -323,16 +324,18 @@ model Expense {
 }
 
 model Employee {
-  id            Int            @id @default(autoincrement())
-  name          String
-  designation   String?
-  phone         String?
-  monthlySalary Float          @default(0)
-  joinDate      DateTime?
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  advances      Advance[]
-  salaryRecords SalaryRecord[]
+  id               Int            @id @default(autoincrement())
+  name             String
+  designation      String?
+  phone            String?
+  monthlySalary    Float          @default(0)
+  joinDate         DateTime?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  linkedCustomerId Int?
+  linkedCustomer   Customer?      @relation(fields: [linkedCustomerId], references: [id])
+  advances         Advance[]
+  salaryRecords    SalaryRecord[]
 }
 
 model Advance {
@@ -349,20 +352,23 @@ model Advance {
 }
 
 model SalaryRecord {
-  id              Int      @id @default(autoincrement())
-  employee        Employee @relation(fields: [employeeId], references: [id])
-  employeeId      Int
-  account         Account  @relation(fields: [accountId], references: [id])
-  accountId       Int
-  month           Int
-  year            Int
-  baseSalary      Float
-  advanceDeducted Float    @default(0)
-  netSalary       Float
-  isPaid          Boolean  @default(false)
-  paidAt          DateTime?
-  note            String?
-  createdAt       DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  employeeId       Int
+  account          Account  @relation(fields: [accountId], references: [id])
+  accountId        Int
+  month            Int
+  year             Int
+  baseSalary       Float
+  advanceDeducted  Float    @default(0)
+  absenceDays      Int      @default(0)
+  absenceDeduction Float    @default(0)
+  invoiceDeducted  Float    @default(0)
+  netSalary        Float
+  isPaid           Boolean  @default(false)
+  paidAt           DateTime?
+  note             String?
+  createdAt        DateTime @default(now())
 
   @@unique([employeeId, month, year])
 }
