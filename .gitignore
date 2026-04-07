@@ -5,6 +5,7 @@ node_modules/
 .agents/
 .replit
 replit.md
+attached_assets/
 
 backend/prisma/dev.db
 backend/node_modules/
