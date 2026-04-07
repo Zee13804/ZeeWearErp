@@ -1,0 +1,52 @@
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+8 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Mon Apr  6 11:04:18 2026 from 169.254.0.1
+root@srv1562853:~# export PATH="/www/server/nodejs/v20.20.2/bin:$PATH"
+
+# Folder banao aur code clone karo
+mkdir -p /www/wwwroot/zeewear.devoriatech.com
+cd /www/wwwroot/zeewear.devoriatech.com
+git clone https://github.com/Zee13804/ZeeWearErp.git .
+
+# Dependencies install karo
+npm install
+cd backend && npm install && cd ..
+Cloning into '.'...
+remote: Enumerating objects: 2142, done.
+remote: Counting objects: 100% (2142/2142), done.
+remote: Compressing objects: 100% (724/724), done.
+remote: Total 2142 (delta 1418), reused 1879 (delta 1215), pack-reused 0 (from 0)
+Receiving objects: 100% (2142/2142), 3.19 MiB | 20.67 MiB/s, done.
+Resolving deltas: 100% (1418/1418), done.
+
+added 218 packages in 14s
+
+44 packages are looking for funding
+  run `npm fund` for details
+npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated fstream@1.0.12: This package is no longer supported.
+
+added 257 packages in 14s
+
+42 packages are looking for funding
+  run `npm fund` for details
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# 

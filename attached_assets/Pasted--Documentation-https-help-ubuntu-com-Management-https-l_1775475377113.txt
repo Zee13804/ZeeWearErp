@@ -1,0 +1,200 @@
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon Apr  6 11:31:38 UTC 2026
+
+  System load:  0.02              Processes:             116
+  Usage of /:   8.8% of 47.39GB   Users logged in:       1
+  Memory usage: 15%               IPv4 address for eth0: 187.127.104.172
+  Swap usage:   0%                IPv6 address for eth0: 2a02:4780:5e:6003::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+8 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Mon Apr  6 11:04:18 2026 from 169.254.0.1
+root@srv1562853:~# export PATH="/www/server/nodejs/v20.20.2/bin:$PATH"
+
+# Folder banao aur code clone karo
+mkdir -p /www/wwwroot/zeewear.devoriatech.com
+cd /www/wwwroot/zeewear.devoriatech.com
+git clone https://github.com/Zee13804/ZeeWearErp.git .
+
+# Dependencies install karo
+npm install
+cd backend && npm install && cd ..
+Cloning into '.'...
+remote: Enumerating objects: 2142, done.
+remote: Counting objects: 100% (2142/2142), done.
+remote: Compressing objects: 100% (724/724), done.
+remote: Total 2142 (delta 1418), reused 1879 (delta 1215), pack-reused 0 (from 0)
+Receiving objects: 100% (2142/2142), 3.19 MiB | 20.67 MiB/s, done.
+Resolving deltas: 100% (1418/1418), done.
+
+added 218 packages in 14s
+
+44 packages are looking for funding
+  run `npm fund` for details
+npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated fstream@1.0.12: This package is no longer supported.
+
+added 257 packages in 14s
+
+42 packages are looking for funding
+  run `npm fund` for details
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# export PATH="/www/server/nodejs/v20.20.2/bin:$PATH"
+cd /www/wwwroot/zeewear.devoriatech.com
+
+# Step 4: Data restore karo
+tar -xzf /tmp/zeewear-data.tar.gz
+
+# Step 5: Database schema apply karo
+DATABASE_URL="file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db" \
+  backend/node_modules/.bin/prisma db push \
+  --schema=backend/prisma/schema.prisma
+
+# Step 6: Frontend build karo
+npm run build
+
+# Step 7: PM2 se start karo
+npm install -g pm2
+pm2 start ecosystem.config.js --env production
+pm2 save
+Prisma schema loaded from backend/prisma/schema.prisma
+Datasource "db": SQLite database "dev.db" at "file:/www/wwwroot/zeewear.devoriatech.com/backend/prisma/dev.db"
+
+The database is already in sync with the Prisma schema.
+
+✔ Generated Prisma Client (v6.19.2) to ./backend/node_modules/@prisma/client in 473ms
+┌─────────────────────────────────────────────────────────┐
+│  Update available 6.19.2 -> 7.6.0                       │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+
+
+> dashboard-app@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 12.5s
+✓ Finished TypeScript in 11.6s    
+✓ Collecting page data using 1 worker in 458.6ms    
+✓ Generating static pages using 1 worker (22/22) in 508.0ms
+✓ Finalizing page optimization in 9.3ms    
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /accessories
+├ ○ /accounting
+├ ○ /accounting/accounts
+├ ○ /accounting/courier-payments
+├ ○ /accounting/employees
+├ ○ /accounting/expenses
+├ ○ /accounting/invoices
+├ ○ /accounting/production-jobs
+├ ƒ /accounting/production-jobs/[id]
+├ ○ /accounting/reports
+├ ○ /accounting/suppliers
+├ ○ /articles
+├ ƒ /articles/[id]
+├ ○ /dashboard
+├ ○ /fabric
+├ ○ /import
+├ ○ /login
+├ ○ /reports
+├ ○ /settings
+├ ○ /users
+└ ○ /variants
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+changed 133 packages in 15s
+
+13 packages are looking for funding
+  run `npm fund` for details
+
+                        -------------
+
+__/\\\\\\\\\\\\\____/\\\\____________/\\\\____/\\\\\\\\\_____
+ _\/\\\/////////\\\_\/\\\\\\________/\\\\\\__/\\\///////\\\___
+  _\/\\\_______\/\\\_\/\\\//\\\____/\\\//\\\_\///______\//\\\__
+   _\/\\\\\\\\\\\\\/__\/\\\\///\\\/\\\/_\/\\\___________/\\\/___
+    _\/\\\/////////____\/\\\__\///\\\/___\/\\\________/\\\//_____
+     _\/\\\_____________\/\\\____\///_____\/\\\_____/\\\//________
+      _\/\\\_____________\/\\\_____________\/\\\___/\\\/___________
+       _\/\\\_____________\/\\\_____________\/\\\__/\\\\\\\\\\\\\\\_
+        _\///______________\///______________\///__\///////////////__
+
+
+                          Runtime Edition
+
+        PM2 is a Production Process Manager for Node.js applications
+                     with a built-in Load Balancer.
+
+                Start and Daemonize any application:
+                $ pm2 start app.js
+
+                Load Balance 4 instances of api.js:
+                $ pm2 start api.js -i 4
+
+                Monitor in production:
+                $ pm2 monitor
+
+                Make pm2 auto-boot at server restart:
+                $ pm2 startup
+
+                To go further checkout:
+                http://pm2.io/
+
+
+                        -------------
+
+[PM2] Spawning PM2 daemon with pm2_home=/root/.pm2
+[PM2] PM2 Successfully daemonized
+[PM2][WARN] Applications zeewear-erp not running, starting...
+[PM2][WARN] Folder does not exist: /www/wwwroot/zeewear.devoriatech.com/logs
+[PM2] Creating folder: /www/wwwroot/zeewear.devoriatech.com/logs
+[PM2] App [zeewear-erp] launched (1 instances)
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ zeewear-erp    │ default     │ 0.1.0   │ fork    │ 27309    │ 0s     │ 0    │ online    │ 0%       │ 27.3mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴───────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+root@srv1562853:/www/wwwroot/zeewear.devoriatech.com# 
