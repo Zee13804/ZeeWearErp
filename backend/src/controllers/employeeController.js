@@ -194,6 +194,23 @@ const createSalary = async (req, res) => {
     const absDays = absenceDays ? parseInt(absenceDays) : 0;
     const absDeduction = absDays > 0 ? parseFloat(((base / 30) * absDays).toFixed(2)) : 0;
     const invDeducted = invoiceDeducted ? parseFloat(invoiceDeducted) : 0;
+
+    if (isNaN(base) || base < 0) return res.status(400).json({ error: 'baseSalary must be a non-negative number' });
+    if (isNaN(deducted) || deducted < 0) return res.status(400).json({ error: 'advanceDeducted must be a non-negative number' });
+    if (isNaN(absDays) || absDays < 0 || absDays > 31) return res.status(400).json({ error: 'absenceDays must be between 0 and 31' });
+    if (isNaN(invDeducted) || invDeducted < 0) return res.status(400).json({ error: 'invoiceDeducted must be a non-negative number' });
+
+    if (invDeducted > 0) {
+      const emp = await prisma.employee.findUnique({ where: { id: eid }, select: { linkedCustomerId: true } });
+      if (emp?.linkedCustomerId) {
+        const invoices = await prisma.invoice.findMany({ where: { customerId: emp.linkedCustomerId }, select: { totalAmount: true, paidAmount: true } });
+        const outstanding = invoices.reduce((s, inv) => s + inv.totalAmount - inv.paidAmount, 0);
+        if (invDeducted > outstanding + 0.01) {
+          return res.status(400).json({ error: `invoiceDeducted (${invDeducted}) exceeds outstanding customer balance (${outstanding.toFixed(2)})` });
+        }
+      }
+    }
+
     const net = base - deducted - absDeduction - invDeducted;
     const paid = markPaid === true || markPaid === 'true';
 
