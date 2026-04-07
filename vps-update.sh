@@ -43,7 +43,7 @@ chown -R www:www "$APP_DIR"
 echo "[5/5] Restarting app..."
 pkill -f "node server.js" 2>/dev/null || true
 sleep 1
-NODE_ENV=production nohup node server.js >> /tmp/zeewear.log 2>&1 &
+NODE_ENV=production nohup $NODE_BIN/node server.js >> /tmp/zeewear.log 2>&1 &
 
 echo ""
 echo "========================================"
