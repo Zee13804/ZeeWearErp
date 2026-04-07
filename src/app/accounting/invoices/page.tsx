@@ -14,11 +14,13 @@ import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, Printer 
 interface Customer { id: number; name: string; phone?: string; _count?: { invoices: number }; }
 interface Account { id: number; name: string; }
 interface Variant { id: number; sku: string; size: string; color: string; quantity: number; }
+interface EmployeeOption { id: number; name: string; }
 
 interface Invoice {
   id: number;
   invoiceNo: string;
   customer: { name: string };
+  employee?: { id: number; name: string } | null;
   status: string;
   totalAmount: number;
   discount: number;
@@ -44,6 +46,7 @@ export default function InvoicesPage() {
   const [tab, setTab] = useState<Tab>("invoices");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +64,7 @@ export default function InvoicesPage() {
 
   const [customerForm, setCustomerForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [invoiceForm, setInvoiceForm] = useState({
-    customerId: "", discount: "0", note: "", invoiceDate: "", adjustStockOut: false,
+    customerId: "", employeeId: "", discount: "0", note: "", invoiceDate: "", adjustStockOut: false,
     items: [{ description: "", variantId: "", sku: "", quantity: "1", unitPrice: "", totalPrice: "" }],
   });
   const [paymentForm, setPaymentForm] = useState({ invoiceId: "", accountId: "", amount: "", note: "", paymentDate: "" });
@@ -69,16 +72,18 @@ export default function InvoicesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [invRes, custRes, accRes, varRes] = await Promise.all([
+      const [invRes, custRes, accRes, varRes, empRes] = await Promise.all([
         apiGet("/accounting/invoices"),
         apiGet("/accounting/invoices/customers"),
         apiGet("/accounting/accounts"),
         apiGet("/variants"),
+        apiGet("/accounting/employees"),
       ]);
       setInvoices(invRes.invoices || []);
       setCustomers(custRes.customers || []);
       setAccounts(accRes.accounts || []);
       setVariants(varRes.variants || []);
+      setEmployees(empRes.employees || []);
     } catch { showToast("Failed to load data", "error"); }
     finally { setLoading(false); }
   };
@@ -124,7 +129,7 @@ export default function InvoicesPage() {
       await apiPost("/accounting/invoices", { ...invoiceForm, items });
       showToast("Invoice created", "success");
       setShowInvoiceForm(false);
-      setInvoiceForm({ customerId: "", discount: "0", note: "", invoiceDate: "", adjustStockOut: false, items: [{ description: "", variantId: "", sku: "", quantity: "1", unitPrice: "", totalPrice: "" }] });
+      setInvoiceForm({ customerId: "", employeeId: "", discount: "0", note: "", invoiceDate: "", adjustStockOut: false, items: [{ description: "", variantId: "", sku: "", quantity: "1", unitPrice: "", totalPrice: "" }] });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -229,7 +234,7 @@ export default function InvoicesPage() {
                               <p className="font-semibold">{inv.invoiceNo}</p>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[inv.status] || ""}`}>{inv.status}</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">{inv.customer.name} · {new Date(inv.invoiceDate).toLocaleDateString()}</p>
+                            <p className="text-xs text-muted-foreground">{inv.customer.name}{inv.employee ? ` · 👤 ${inv.employee.name}` : ""} · {new Date(inv.invoiceDate).toLocaleDateString()}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -329,6 +334,9 @@ export default function InvoicesPage() {
             </FormField>
             <FormField label="Invoice Date"><Input type="date" value={invoiceForm.invoiceDate} onChange={e => setInvoiceForm({ ...invoiceForm, invoiceDate: e.target.value })} /></FormField>
           </div>
+          <FormField label="Link to Employee (optional)">
+            <Select value={invoiceForm.employeeId} onChange={val => setInvoiceForm({ ...invoiceForm, employeeId: val })} options={[{ label: "None", value: "" }, ...employees.map(e => ({ label: e.name, value: String(e.id) }))]} />
+          </FormField>
           <div className="space-y-2">
             <p className="text-sm font-medium">Items</p>
             {invoiceForm.items.map((item, idx) => (

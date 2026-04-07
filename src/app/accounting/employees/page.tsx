@@ -12,13 +12,12 @@ import { isAdmin, isAccountant } from "@/lib/auth";
 import { Plus, Trash2, Loader2, CheckCircle, Wallet, Edit2 } from "lucide-react";
 
 interface Account { id: number; name: string; type: string; balance: number; }
-interface Customer { id: number; name: string; }
-interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; linkedCustomerId?: number; }
+interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; }
 interface Advance { id: number; employee: { name: string }; amount: number; repaid: number; reason?: string; advanceDate: string; accountId?: number; }
 interface Salary { id: number; employee: { name: string; designation?: string }; month: number; year: number; baseSalary: number; advanceDeducted: number; absenceDays: number; absenceDeduction: number; invoiceDeducted: number; netSalary: number; isPaid: boolean; paidAt?: string; accountId?: number; note?: string; }
 interface Labour { id: number; workerName: string; description?: string; amount: number; weekStart?: string; weekEnd?: string; paymentDate: string; accountId?: number; }
-interface PendingInvoice { id: number; invoiceNo: string; invoiceDate: string; totalAmount: number; paidAmount: number; pendingAmount: number; }
-interface InvoiceBalance { hasLinkedCustomer: boolean; customerId?: number; customerName?: string; totalInvoiced?: number; totalPaid?: number; outstanding?: number; pendingInvoices?: PendingInvoice[]; }
+interface PendingInvoice { id: number; invoiceNo: string; invoiceDate: string; customerName?: string; totalAmount: number; paidAmount: number; pendingAmount: number; }
+interface InvoiceBalance { hasPendingInvoices: boolean; totalInvoiced?: number; totalPaid?: number; outstanding?: number; pendingInvoices?: PendingInvoice[]; }
 
 type Tab = "employees" | "advances" | "salaries" | "labour";
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -31,7 +30,6 @@ export default function EmployeesPage() {
   const canManageEmployees = isAdmin();
   const [tab, setTab] = useState<Tab>("employees");
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
@@ -43,7 +41,7 @@ export default function EmployeesPage() {
 
   const [showEmpForm, setShowEmpForm] = useState(false);
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
+  const [editForm, setEditForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "" });
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [showSalaryForm, setShowSalaryForm] = useState(false);
   const [showLabourForm, setShowLabourForm] = useState(false);
@@ -53,7 +51,7 @@ export default function EmployeesPage() {
   const [markPaidAccountId, setMarkPaidAccountId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; type: string; name: string } | null>(null);
 
-  const [empForm, setEmpForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
+  const [empForm, setEmpForm] = useState({ name: "", designation: "", phone: "", monthlySalary: "" });
   const [advanceForm, setAdvanceForm] = useState({ employeeId: "", amount: "", reason: "", advanceDate: "", accountId: "" });
   const [salaryForm, setSalaryForm] = useState({
     employeeId: "", month: String(new Date().getMonth() + 1),
@@ -86,8 +84,6 @@ export default function EmployeesPage() {
       setAdvances(advRes.advances || []);
       setSalaries(salRes.salaries || []);
       setLabour(labRes.payments || []);
-      const custResult = await apiGet("/accounting/invoices/customers").catch(() => ({ customers: [] }));
-      setCustomers(custResult.customers || []);
     } catch { showToast("Failed to load", "error"); }
     finally { setLoading(false); }
   };
@@ -109,10 +105,10 @@ export default function EmployeesPage() {
     if (!empForm.name) { showToast("Name required", "error"); return; }
     setSaving(true);
     try {
-      await apiPost("/accounting/employees", { ...empForm, linkedCustomerId: empForm.linkedCustomerId || null });
+      await apiPost("/accounting/employees", empForm);
       showToast("Employee added", "success");
       setShowEmpForm(false);
-      setEmpForm({ name: "", designation: "", phone: "", monthlySalary: "", linkedCustomerId: "" });
+      setEmpForm({ name: "", designation: "", phone: "", monthlySalary: "" });
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -123,7 +119,7 @@ export default function EmployeesPage() {
     if (!editEmp || !editForm.name) { showToast("Name required", "error"); return; }
     setSaving(true);
     try {
-      await apiPut(`/accounting/employees/${editEmp.id}`, { ...editForm, linkedCustomerId: editForm.linkedCustomerId || null });
+      await apiPut(`/accounting/employees/${editEmp.id}`, editForm);
       showToast("Employee updated", "success");
       setEditEmp(null);
       load();
@@ -270,7 +266,7 @@ export default function EmployeesPage() {
                         {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
                       </div>
                       <div className="flex items-center gap-1">
-                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary), linkedCustomerId: emp.linkedCustomerId ? String(emp.linkedCustomerId) : "" }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
+                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary) }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
                         {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                       </div>
                     </div>
@@ -456,9 +452,6 @@ export default function EmployeesPage() {
             <FormField label="Phone"><Input value={empForm.phone} onChange={e => setEmpForm({ ...empForm, phone: e.target.value })} placeholder="Phone number" /></FormField>
           </div>
           <FormField label="Monthly Salary (Rs)"><Input type="number" value={empForm.monthlySalary} onChange={e => setEmpForm({ ...empForm, monthlySalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
-          <FormField label="Linked Customer (optional)">
-            <Select value={empForm.linkedCustomerId} onChange={val => setEmpForm({ ...empForm, linkedCustomerId: val })} options={[{ label: "None", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
-          </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setShowEmpForm(false)} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Add Employee"}</Button>
@@ -475,9 +468,6 @@ export default function EmployeesPage() {
             <FormField label="Phone"><Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone number" /></FormField>
           </div>
           <FormField label="Monthly Salary (Rs)"><Input type="number" value={editForm.monthlySalary} onChange={e => setEditForm({ ...editForm, monthlySalary: e.target.value })} placeholder="0" min="0" step="any" /></FormField>
-          <FormField label="Linked Customer (optional)">
-            <Select value={editForm.linkedCustomerId} onChange={val => setEditForm({ ...editForm, linkedCustomerId: val })} options={[{ label: "None", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
-          </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setEditEmp(null)} className="cursor-pointer">Cancel</Button>
             <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Update Employee"}</Button>
@@ -545,19 +535,22 @@ export default function EmployeesPage() {
 
           {/* Invoice Deduction */}
           {loadingBalance && <div className="text-xs text-muted-foreground">Loading invoice balance...</div>}
-          {invoiceBalance?.hasLinkedCustomer && (invoiceBalance.outstanding || 0) <= 0 && (
+          {!loadingBalance && invoiceBalance && !invoiceBalance.hasPendingInvoices && (invoiceBalance.totalInvoiced || 0) > 0 && (
             <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">
-              ✓ {invoiceBalance.customerName} — koi pending bill nahi (sab paid)
+              ✓ Is employee ke saare bills paid hain
             </div>
           )}
-          {invoiceBalance?.hasLinkedCustomer && (invoiceBalance.outstanding || 0) > 0 && (
+          {invoiceBalance?.hasPendingInvoices && (invoiceBalance.outstanding || 0) > 0 && (
             <div className="border border-purple-200 dark:border-purple-900 rounded-lg p-3 space-y-2 bg-purple-50/50 dark:bg-purple-950/20">
-              <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">Pending Bills — {invoiceBalance.customerName}</p>
+              <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">Pending Bills</p>
               {invoiceBalance.pendingInvoices && invoiceBalance.pendingInvoices.length > 0 && (
                 <div className="space-y-1">
                   {invoiceBalance.pendingInvoices.map(inv => (
                     <div key={inv.id} className="flex items-center justify-between text-xs bg-purple-100/60 dark:bg-purple-900/30 rounded px-2 py-1">
-                      <span className="text-purple-800 dark:text-purple-300 font-medium">{inv.invoiceNo}</span>
+                      <div>
+                        <span className="text-purple-800 dark:text-purple-300 font-medium">{inv.invoiceNo}</span>
+                        {inv.customerName && <span className="text-muted-foreground ml-1">({inv.customerName})</span>}
+                      </div>
                       <span className="text-muted-foreground">{new Date(inv.invoiceDate).toLocaleDateString("en-PK")}</span>
                       <span className="text-red-600 font-semibold">Rs {fmt(inv.pendingAmount)}</span>
                     </div>

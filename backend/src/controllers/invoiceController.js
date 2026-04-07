@@ -96,6 +96,7 @@ const getInvoices = async (req, res) => {
       where,
       include: {
         customer: { select: { id: true, name: true } },
+        employee: { select: { id: true, name: true } },
         items: {
           include: {
             variant: { select: { id: true, sku: true, size: true, color: true } },
@@ -115,7 +116,7 @@ const getInvoices = async (req, res) => {
 
 const createInvoice = async (req, res) => {
   try {
-    const { customerId, discount, note, items, invoiceDate, adjustStockOut } = req.body;
+    const { customerId, employeeId, discount, note, items, invoiceDate, adjustStockOut } = req.body;
     if (!customerId || !items?.length)
       return res.status(400).json({ error: 'customerId and items are required' });
 
@@ -124,6 +125,7 @@ const createInvoice = async (req, res) => {
     const invoice = await prisma.invoice.create({
       data: {
         customerId: parseInt(customerId),
+        employeeId: employeeId ? parseInt(employeeId) : null,
         invoiceNo: generateInvoiceNo(),
         discount: discount ? parseFloat(discount) : 0,
         totalAmount: Math.round(totalAmount * 100) / 100,
@@ -140,7 +142,7 @@ const createInvoice = async (req, res) => {
           })),
         },
       },
-      include: { items: true, customer: true },
+      include: { items: true, customer: true, employee: { select: { id: true, name: true } } },
     });
 
     if (adjustStockOut) {

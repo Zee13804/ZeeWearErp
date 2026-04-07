@@ -256,13 +256,14 @@ model Customer {
   isActive        Boolean    @default(true)
   createdAt       DateTime   @default(now())
   invoices        Invoice[]
-  linkedEmployees Employee[]
 }
 
 model Invoice {
   id           Int              @id @default(autoincrement())
   customer     Customer         @relation(fields: [customerId], references: [id])
   customerId   Int
+  employee     Employee?        @relation(fields: [employeeId], references: [id])
+  employeeId   Int?
   invoiceNo    String           @unique
   status       String           @default("unpaid")
   discount     Float            @default(0)
@@ -332,10 +333,9 @@ model Employee {
   joinDate         DateTime?
   isActive         Boolean        @default(true)
   createdAt        DateTime       @default(now())
-  linkedCustomerId Int?
-  linkedCustomer   Customer?      @relation(fields: [linkedCustomerId], references: [id])
   advances         Advance[]
   salaryRecords    SalaryRecord[]
+  linkedInvoices   Invoice[]
 }
 
 model Advance {

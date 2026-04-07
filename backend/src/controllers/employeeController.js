@@ -36,7 +36,7 @@ const getEmployees = async (req, res) => {
 
 const createEmployee = async (req, res) => {
   try {
-    const { name, designation, phone, monthlySalary, joinDate, linkedCustomerId } = req.body;
+    const { name, designation, phone, monthlySalary, joinDate } = req.body;
     if (!name) return res.status(400).json({ error: 'Employee name is required' });
 
     const employee = await prisma.employee.create({
@@ -46,7 +46,6 @@ const createEmployee = async (req, res) => {
         phone: phone || null,
         monthlySalary: monthlySalary ? parseFloat(monthlySalary) : 0,
         joinDate: joinDate ? new Date(joinDate) : null,
-        linkedCustomerId: linkedCustomerId ? parseInt(linkedCustomerId) : null,
       },
     });
     return res.status(201).json({ message: 'Employee created', employee });
@@ -58,7 +57,7 @@ const createEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, designation, phone, monthlySalary, joinDate, linkedCustomerId } = req.body;
+    const { name, designation, phone, monthlySalary, joinDate } = req.body;
 
     const employee = await prisma.employee.update({
       where: { id: parseInt(id) },
@@ -68,7 +67,6 @@ const updateEmployee = async (req, res) => {
         ...(phone !== undefined && { phone: phone || null }),
         ...(monthlySalary !== undefined && { monthlySalary: parseFloat(monthlySalary) }),
         ...(joinDate !== undefined && { joinDate: joinDate ? new Date(joinDate) : null }),
-        ...(linkedCustomerId !== undefined && { linkedCustomerId: linkedCustomerId ? parseInt(linkedCustomerId) : null }),
       },
     });
     return res.json({ message: 'Employee updated', employee });
@@ -201,13 +199,10 @@ const createSalary = async (req, res) => {
     if (isNaN(invDeducted) || invDeducted < 0) return res.status(400).json({ error: 'invoiceDeducted must be a non-negative number' });
 
     if (invDeducted > 0) {
-      const emp = await prisma.employee.findUnique({ where: { id: eid }, select: { linkedCustomerId: true } });
-      if (emp?.linkedCustomerId) {
-        const invoices = await prisma.invoice.findMany({ where: { customerId: emp.linkedCustomerId }, select: { totalAmount: true, paidAmount: true } });
-        const outstanding = invoices.reduce((s, inv) => s + inv.totalAmount - inv.paidAmount, 0);
-        if (invDeducted > outstanding + 0.01) {
-          return res.status(400).json({ error: `invoiceDeducted (${invDeducted}) exceeds outstanding customer balance (${outstanding.toFixed(2)})` });
-        }
+      const invoices = await prisma.invoice.findMany({ where: { employeeId: eid }, select: { totalAmount: true, paidAmount: true } });
+      const outstanding = invoices.reduce((s, inv) => s + inv.totalAmount - inv.paidAmount, 0);
+      if (invDeducted > outstanding + 0.01) {
+        return res.status(400).json({ error: `invoiceDeducted (${invDeducted}) exceeds outstanding invoice balance (${outstanding.toFixed(2)})` });
       }
     }
 
@@ -266,16 +261,14 @@ const createSalary = async (req, res) => {
 const getEmployeeInvoiceBalance = async (req, res) => {
   try {
     const { id } = req.params;
-    const employee = await prisma.employee.findUnique({
-      where: { id: parseInt(id) },
-      include: { linkedCustomer: { select: { id: true, name: true } } },
-    });
+    const eid = parseInt(id);
+
+    const employee = await prisma.employee.findUnique({ where: { id: eid } });
     if (!employee) return res.status(404).json({ error: 'Employee not found' });
-    if (!employee.linkedCustomerId) return res.json({ hasLinkedCustomer: false });
 
     const invoices = await prisma.invoice.findMany({
-      where: { customerId: employee.linkedCustomerId },
-      select: { id: true, invoiceNo: true, invoiceDate: true, totalAmount: true, paidAmount: true, status: true },
+      where: { employeeId: eid },
+      select: { id: true, invoiceNo: true, invoiceDate: true, totalAmount: true, paidAmount: true, customer: { select: { name: true } } },
       orderBy: { invoiceDate: 'asc' },
     });
 
@@ -284,23 +277,22 @@ const getEmployeeInvoiceBalance = async (req, res) => {
     const outstanding = totalInvoiced - totalPaid;
 
     const pendingInvoices = invoices
-      .filter(inv => inv.totalAmount - inv.paidAmount > 0)
+      .filter(inv => inv.totalAmount - inv.paidAmount > 0.001)
       .map(inv => ({
         id: inv.id,
         invoiceNo: inv.invoiceNo,
         invoiceDate: inv.invoiceDate,
+        customerName: inv.customer?.name || '',
         totalAmount: inv.totalAmount,
         paidAmount: inv.paidAmount,
-        pendingAmount: inv.totalAmount - inv.paidAmount,
+        pendingAmount: parseFloat((inv.totalAmount - inv.paidAmount).toFixed(2)),
       }));
 
     return res.json({
-      hasLinkedCustomer: true,
-      customerId: employee.linkedCustomerId,
-      customerName: employee.linkedCustomer?.name || '',
+      hasPendingInvoices: pendingInvoices.length > 0,
       totalInvoiced,
       totalPaid,
-      outstanding,
+      outstanding: parseFloat(outstanding.toFixed(2)),
       pendingInvoices,
     });
   } catch (err) {
