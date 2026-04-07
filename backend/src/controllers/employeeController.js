@@ -16,16 +16,14 @@ const getEmployees = async (req, res) => {
     });
 
     const enriched = await Promise.all(employees.map(async (emp) => {
-      const totalAdvances = await prisma.advance.aggregate({
-        where: { employeeId: emp.id },
-        _sum: { amount: true },
-      });
-      const totalRepaid = await prisma.advance.aggregate({
-        where: { employeeId: emp.id },
-        _sum: { repaid: true },
-      });
+      const [totalAdvances, totalRepaid, empInvoices] = await Promise.all([
+        prisma.advance.aggregate({ where: { employeeId: emp.id }, _sum: { amount: true } }),
+        prisma.advance.aggregate({ where: { employeeId: emp.id }, _sum: { repaid: true } }),
+        prisma.invoice.findMany({ where: { employeeId: emp.id }, select: { totalAmount: true, paidAmount: true } }),
+      ]);
       const advanceBalance = (totalAdvances._sum.amount || 0) - (totalRepaid._sum.repaid || 0);
-      return { ...emp, advanceBalance };
+      const invoiceOutstanding = empInvoices.reduce((s, inv) => s + Math.max(0, inv.totalAmount - inv.paidAmount), 0);
+      return { ...emp, advanceBalance, invoiceOutstanding };
     }));
 
     return res.json({ employees: enriched });

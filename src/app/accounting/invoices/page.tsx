@@ -4,12 +4,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { isAdmin } from "@/lib/auth";
-import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, Printer } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, Printer, Search } from "lucide-react";
 
 interface Customer { id: number; name: string; phone?: string; _count?: { invoices: number }; }
 interface Account { id: number; name: string; }
@@ -61,6 +61,8 @@ export default function InvoicesPage() {
   const billInputRef = useRef<HTMLInputElement>(null);
   const [billTargetId, setBillTargetId] = useState<number | null>(null);
   const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const [customerForm, setCustomerForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [invoiceForm, setInvoiceForm] = useState({
@@ -188,6 +190,16 @@ export default function InvoicesPage() {
   };
 
   const totalPending = invoices.filter(i => i.status !== "paid").reduce((s, i) => s + (i.totalAmount - i.discount - i.paidAmount), 0);
+  const filteredInvoices = invoices.filter(inv => {
+    if (!invoiceSearch) return true;
+    const q = invoiceSearch.toLowerCase();
+    return inv.invoiceNo.toLowerCase().includes(q) || inv.customer.name.toLowerCase().includes(q) || (inv.employee?.name || "").toLowerCase().includes(q);
+  });
+  const filteredCustomers = customers.filter(c => {
+    if (!customerSearch) return true;
+    const q = customerSearch.toLowerCase();
+    return c.name.toLowerCase().includes(q) || (c.phone || "").toLowerCase().includes(q);
+  });
 
   return (
     <DashboardLayout>
@@ -220,9 +232,13 @@ export default function InvoicesPage() {
                 <span className="text-sm font-medium text-muted-foreground">Total Pending Receivable</span>
                 <span className="text-xl font-bold text-amber-600">Rs {fmt(totalPending)}</span>
               </div>
-              {invoices.length === 0 ? <div className="text-center py-12 text-muted-foreground">No invoices yet.</div> : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={invoiceSearch} onChange={e => setInvoiceSearch(e.target.value)} placeholder="Search by invoice no, customer, or employee..." className="pl-9" />
+              </div>
+              {filteredInvoices.length === 0 ? <div className="text-center py-12 text-muted-foreground">{invoiceSearch ? "No invoices match your search." : "No invoices yet."}</div> : (
                 <div className="space-y-2">
-                  {invoices.map(inv => (
+                  {filteredInvoices.map(inv => (
                     <div key={inv.id} className="bg-background rounded-xl border border-border overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -280,32 +296,38 @@ export default function InvoicesPage() {
               )}
             </>
           ) : tab === "customers" ? (
-            customers.length === 0 ? <div className="text-center py-12 text-muted-foreground">No customers yet.</div> : (
-              <div className="bg-background rounded-xl border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b border-border">
-                    <tr>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Phone</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Invoices</th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {customers.map(c => (
-                      <tr key={c.id} className="hover:bg-muted/30">
-                        <td className="px-4 py-3 font-medium">{c.name}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{c.phone || "—"}</td>
-                        <td className="px-4 py-3 text-right">{c._count?.invoices || 0}</td>
-                        <td className="px-4 py-3 text-right">
-                          {canDelete && <button onClick={async () => { try { await apiDelete(`/accounting/invoices/customers/${c.id}`); showToast("Deleted", "success"); load(); } catch { showToast("Failed", "error"); } }} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Search by name or phone..." className="pl-9" />
               </div>
-            )
+              {filteredCustomers.length === 0 ? <div className="text-center py-12 text-muted-foreground">{customerSearch ? "No customers match your search." : "No customers yet."}</div> : (
+                <div className="bg-background rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b border-border">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Phone</th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">Invoices</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredCustomers.map(c => (
+                        <tr key={c.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-medium">{c.name}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{c.phone || "—"}</td>
+                          <td className="px-4 py-3 text-right">{c._count?.invoices || 0}</td>
+                          <td className="px-4 py-3 text-right">
+                            {canDelete && <button onClick={async () => { try { await apiDelete(`/accounting/invoices/customers/${c.id}`); showToast("Deleted", "success"); load(); } catch { showToast("Failed", "error"); } }} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-12 text-muted-foreground">Use the + button to record invoice payments.</div>
           )}
@@ -330,24 +352,29 @@ export default function InvoicesPage() {
         <form onSubmit={handleInvoiceSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Customer" required>
-              <Select value={invoiceForm.customerId} onChange={val => setInvoiceForm({ ...invoiceForm, customerId: val})} options={[{ label: "Select customer", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
+              <SearchSelect value={invoiceForm.customerId} onChange={val => setInvoiceForm({ ...invoiceForm, customerId: val})} placeholder="Search customer..." options={[{ label: "— None —", value: "" }, ...customers.map(c => ({ label: c.name, value: String(c.id) }))]} />
             </FormField>
             <FormField label="Invoice Date"><Input type="date" value={invoiceForm.invoiceDate} onChange={e => setInvoiceForm({ ...invoiceForm, invoiceDate: e.target.value })} /></FormField>
           </div>
           <FormField label="Link to Employee (optional)">
-            <Select value={invoiceForm.employeeId} onChange={val => setInvoiceForm({ ...invoiceForm, employeeId: val })} options={[{ label: "None", value: "" }, ...employees.map(e => ({ label: e.name, value: String(e.id) }))]} />
+            <SearchSelect value={invoiceForm.employeeId} onChange={val => setInvoiceForm({ ...invoiceForm, employeeId: val })} placeholder="Search employee..." options={[{ label: "— None —", value: "" }, ...employees.map(e => ({ label: e.name, value: String(e.id) }))]} />
           </FormField>
           <div className="space-y-2">
             <p className="text-sm font-medium">Items</p>
             {invoiceForm.items.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-4">
-                  <Select value={item.variantId} onChange={val => updateItem(idx, "variantId", val)} options={[{ label: "Select variant", value: "" }, ...variants.map(v => ({ label: `${v.sku} (${v.size}/${v.color})`, value: String(v.id) }))]} />
+              <div key={idx} className="space-y-1 pb-2 border-b border-border last:border-0">
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-7">
+                    <SearchSelect value={item.variantId} onChange={val => updateItem(idx, "variantId", val)} placeholder="Search SKU / variant..." options={[{ label: "— Custom item —", value: "" }, ...variants.map(v => ({ label: `${v.sku}  ${v.size}/${v.color}  (Stock: ${v.quantity})`, value: String(v.id) }))]} />
+                  </div>
+                  <div className="col-span-4"><Input value={item.description} onChange={e => updateItem(idx, "description", e.target.value)} placeholder="Description" /></div>
+                  <div className="col-span-1 flex justify-end">{idx > 0 && <button type="button" onClick={() => setInvoiceForm({ ...invoiceForm, items: invoiceForm.items.filter((_, i) => i !== idx) })} className="cursor-pointer mt-1"><X className="w-4 h-4 text-red-500" /></button>}</div>
                 </div>
-                <div className="col-span-3"><Input value={item.description} onChange={e => updateItem(idx, "description", e.target.value)} placeholder="Description" /></div>
-                <div className="col-span-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} placeholder="Qty" min="0.01" step="any" /></div>
-                <div className="col-span-2"><Input type="number" value={item.unitPrice} onChange={e => updateItem(idx, "unitPrice", e.target.value)} placeholder="Price" min="0" step="any" /></div>
-                <div className="col-span-1">{idx > 0 && <button type="button" onClick={() => setInvoiceForm({ ...invoiceForm, items: invoiceForm.items.filter((_, i) => i !== idx) })} className="cursor-pointer"><X className="w-4 h-4 text-red-500" /></button>}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} placeholder="Quantity" min="0.01" step="any" />
+                  <Input type="number" value={item.unitPrice} onChange={e => updateItem(idx, "unitPrice", e.target.value)} placeholder="Unit Price (Rs)" min="0" step="any" />
+                </div>
+                {item.totalPrice && <p className="text-xs text-muted-foreground pl-1">Total: <span className="font-semibold text-foreground">Rs {fmt(parseFloat(item.totalPrice) || 0)}</span></p>}
               </div>
             ))}
             <button type="button" onClick={() => setInvoiceForm({ ...invoiceForm, items: [...invoiceForm.items, { description: "", variantId: "", sku: "", quantity: "1", unitPrice: "", totalPrice: "" }] })} className="text-xs text-primary hover:underline cursor-pointer">+ Add Item</button>

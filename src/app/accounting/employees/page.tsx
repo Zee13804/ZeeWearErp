@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { isAdmin, isAccountant } from "@/lib/auth";
-import { Plus, Trash2, Loader2, CheckCircle, Wallet, Edit2 } from "lucide-react";
+import { Plus, Trash2, Loader2, CheckCircle, Wallet, Edit2, Search, FileText } from "lucide-react";
 
 interface Account { id: number; name: string; type: string; balance: number; }
-interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; isActive: boolean; }
+interface Employee { id: number; name: string; designation?: string; phone?: string; monthlySalary: number; advanceBalance: number; invoiceOutstanding: number; isActive: boolean; }
 interface Advance { id: number; employee: { name: string }; amount: number; repaid: number; reason?: string; advanceDate: string; accountId?: number; }
 interface Salary { id: number; employee: { name: string; designation?: string }; month: number; year: number; baseSalary: number; advanceDeducted: number; absenceDays: number; absenceDeduction: number; invoiceDeducted: number; netSalary: number; isPaid: boolean; paidAt?: string; accountId?: number; note?: string; }
 interface Labour { id: number; workerName: string; description?: string; amount: number; weekStart?: string; weekEnd?: string; paymentDate: string; accountId?: number; }
@@ -36,6 +36,9 @@ export default function EmployeesPage() {
   const [labour, setLabour] = useState<Labour[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
+  const [salarySearch, setSalarySearch] = useState("");
+  const [advanceSearch, setAdvanceSearch] = useState("");
   const [invoiceBalance, setInvoiceBalance] = useState<InvoiceBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
 
@@ -228,6 +231,14 @@ export default function EmployeesPage() {
   const totalAdvancePending = advances.reduce((s, a) => s + (a.amount - a.repaid), 0);
   const totalSalaryPending = salaries.filter(s => !s.isPaid).reduce((s, sal) => s + sal.netSalary, 0);
   const totalLabour = labour.reduce((s, l) => s + l.amount, 0);
+  const filteredEmployees = employees.filter(e => {
+    if (!empSearch) return true;
+    const q = empSearch.toLowerCase();
+    return e.name.toLowerCase().includes(q) || (e.designation || "").toLowerCase().includes(q) || (e.phone || "").toLowerCase().includes(q);
+  });
+  const filteredSalaries = salaries.filter(s => !salarySearch || s.employee.name.toLowerCase().includes(salarySearch.toLowerCase()));
+  const filteredAdvances = advances.filter(a => !advanceSearch || a.employee.name.toLowerCase().includes(advanceSearch.toLowerCase()));
+  const totalInvoiceOutstanding = employees.reduce((s, e) => s + (e.invoiceOutstanding || 0), 0);
 
   return (
     <DashboardLayout>
@@ -255,35 +266,51 @@ export default function EmployeesPage() {
 
         {loading ? <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
           : tab === "employees" ? (
-            employees.length === 0 ? <div className="text-center py-12 text-muted-foreground">No employees yet.</div> : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {employees.map(emp => (
-                  <div key={emp.id} className="bg-background rounded-xl border border-border p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold">{emp.name}</p>
-                        <p className="text-xs text-muted-foreground">{emp.designation || "No designation"}</p>
-                        {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary) }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
-                        {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Monthly Salary</p>
-                        <p className="font-semibold text-foreground">Rs {fmt(emp.monthlySalary)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Advance Due</p>
-                        <p className={`font-semibold ${emp.advanceBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(emp.advanceBalance)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <>
+              {totalInvoiceOutstanding > 0 && (
+                <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-sm text-purple-700 dark:text-purple-400 font-medium flex items-center gap-2"><FileText className="w-4 h-4" /> Total Invoice Outstanding (All Employees)</span>
+                  <span className="font-bold text-purple-700 dark:text-purple-400">Rs {fmt(totalInvoiceOutstanding)}</span>
+                </div>
+              )}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={empSearch} onChange={e => setEmpSearch(e.target.value)} placeholder="Search by name, designation, or phone..." className="pl-9" />
               </div>
-            )
+              {filteredEmployees.length === 0 ? <div className="text-center py-12 text-muted-foreground">{empSearch ? "No employees match your search." : "No employees yet."}</div> : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredEmployees.map(emp => (
+                    <div key={emp.id} className="bg-background rounded-xl border border-border p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold">{emp.name}</p>
+                          <p className="text-xs text-muted-foreground">{emp.designation || "No designation"}</p>
+                          {emp.phone && <p className="text-xs text-muted-foreground">{emp.phone}</p>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {canManageEmployees && <button onClick={() => { setEditEmp(emp); setEditForm({ name: emp.name, designation: emp.designation || "", phone: emp.phone || "", monthlySalary: String(emp.monthlySalary) }); }} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer"><Edit2 className="w-3.5 h-3.5 text-blue-500" /></button>}
+                          {canDelete && <button onClick={() => setDeleteTarget({ id: emp.id, type: "employee", name: emp.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-border grid grid-cols-3 gap-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Salary</p>
+                          <p className="font-semibold text-foreground text-sm">Rs {fmt(emp.monthlySalary)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Advance Due</p>
+                          <p className={`font-semibold text-sm ${emp.advanceBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(emp.advanceBalance)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Invoice Due</p>
+                          <p className={`font-semibold text-sm ${(emp.invoiceOutstanding || 0) > 0 ? "text-purple-600" : "text-emerald-600"}`}>Rs {fmt(emp.invoiceOutstanding || 0)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           ) : tab === "advances" ? (
             <>
               {totalAdvancePending > 0 && (
@@ -292,7 +319,11 @@ export default function EmployeesPage() {
                   <span className="font-bold text-amber-700 dark:text-amber-400">Rs {fmt(totalAdvancePending)}</span>
                 </div>
               )}
-              {advances.length === 0 ? <div className="text-center py-12 text-muted-foreground">No advances recorded.</div> : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={advanceSearch} onChange={e => setAdvanceSearch(e.target.value)} placeholder="Search by employee name..." className="pl-9" />
+              </div>
+              {filteredAdvances.length === 0 ? <div className="text-center py-12 text-muted-foreground">{advanceSearch ? "No advances match your search." : "No advances recorded."}</div> : (
                 <div className="bg-background rounded-xl border border-border overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 border-b border-border">
@@ -308,7 +339,7 @@ export default function EmployeesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {advances.map(a => {
+                      {filteredAdvances.map(a => {
                         const acc = accounts.find(ac => ac.id === a.accountId);
                         return (
                           <tr key={a.id} className="hover:bg-muted/30">
@@ -343,7 +374,11 @@ export default function EmployeesPage() {
                   <span className="font-bold text-red-700 dark:text-red-400">Rs {fmt(totalSalaryPending)}</span>
                 </div>
               )}
-              {salaries.length === 0 ? <div className="text-center py-12 text-muted-foreground">No salary records yet.</div> : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={salarySearch} onChange={e => setSalarySearch(e.target.value)} placeholder="Search by employee name..." className="pl-9" />
+              </div>
+              {filteredSalaries.length === 0 ? <div className="text-center py-12 text-muted-foreground">{salarySearch ? "No salary records match your search." : "No salary records yet."}</div> : (
                 <div className="bg-background rounded-xl border border-border overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 border-b border-border">
@@ -361,7 +396,7 @@ export default function EmployeesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {salaries.map(s => {
+                      {filteredSalaries.map(s => {
                         const acc = accounts.find(ac => ac.id === s.accountId);
                         return (
                           <tr key={s.id} className="hover:bg-muted/30">
