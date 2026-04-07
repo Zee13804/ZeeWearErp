@@ -1621,7 +1621,9 @@ interface SalaryDueData {
   employees: Array<{
     id: number; name: string; designation: string;
     monthlySalary: number; baseSalary: number;
-    outstandingAdvance: number; advanceDeducted: number;
+    outstandingAdvance: number; invoiceOutstanding: number;
+    advanceDeducted: number; absenceDays: number;
+    absenceDeduction: number; invoiceDeducted: number;
     netSalary: number; isPaid: boolean; isProcessed: boolean;
     salaryRecordId: number | null; note: string;
   }>;
@@ -1629,7 +1631,7 @@ interface SalaryDueData {
     totalEmployees: number; processedCount: number;
     paidCount: number; unpaidCount: number;
     totalBase: number; totalDeduct: number; totalNet: number;
-    totalPaid: number; totalPending: number;
+    totalPaid: number; totalPending: number; totalInvoiceDue: number;
   };
 }
 
@@ -1637,14 +1639,16 @@ function SalaryDueReport({ data, onExport }: { data: SalaryDueData; onExport: (r
   if (!data?.employees) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
 
   const csvRows = [
-    ["Employee", "Designation", "Base Salary", "Outstanding Advance", "Advance Deducted", "Net Salary", "Status"],
+    ["Employee", "Designation", "Base Salary", "Adv. Balance", "Inv. Due", "Adv. Deducted", "Absence Days", "Absence Ded.", "Inv. Deducted", "Net Salary", "Status"],
     ...data.employees.map(e => [
-      e.name, e.designation, e.baseSalary, e.outstandingAdvance,
-      e.advanceDeducted, e.netSalary,
+      e.name, e.designation, e.baseSalary,
+      e.outstandingAdvance, e.invoiceOutstanding,
+      e.advanceDeducted, e.absenceDays, e.absenceDeduction, e.invoiceDeducted,
+      e.netSalary,
       e.isPaid ? "Paid" : e.isProcessed ? "Processed (Unpaid)" : "Pending",
     ]),
-    ["", "", "", "", "", "", ""],
-    ["TOTAL", "", data.summary.totalBase, "", data.summary.totalDeduct, data.summary.totalNet, ""],
+    [],
+    ["TOTAL", "", data.summary.totalBase, "", "", data.summary.totalDeduct, "", "", "", data.summary.totalNet, ""],
   ];
 
   const unpaidEmployees = data.employees.filter(e => !e.isPaid);
@@ -1660,11 +1664,14 @@ function SalaryDueReport({ data, onExport }: { data: SalaryDueData; onExport: (r
         <Button variant="outline" size="sm" onClick={() => onExport(csvRows, `salary-due-${data.monthName}-${data.year}.csv`)} className="gap-2 cursor-pointer print:hidden"><Download className="w-4 h-4" /> Export CSV</Button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <StatBox label="Total Employees" value={String(data.summary.totalEmployees)} color="text-foreground" />
         <StatBox label="Total Gross" value={`Rs ${fmt(data.summary.totalBase)}`} color="text-foreground" />
-        <StatBox label="Advance Deductions" value={`Rs ${fmt(data.summary.totalDeduct)}`} color="text-amber-600" />
+        <StatBox label="Total Deductions" value={`Rs ${fmt(data.summary.totalDeduct)}`} color="text-amber-600" />
         <StatBox label="Net Payable" value={`Rs ${fmt(data.summary.totalNet)}`} color="text-blue-600" />
+        {(data.summary.totalInvoiceDue ?? 0) > 0 && (
+          <StatBox label="Invoice Due (All)" value={`Rs ${fmt(data.summary.totalInvoiceDue)}`} color="text-purple-600" />
+        )}
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
@@ -1690,37 +1697,55 @@ function SalaryDueReport({ data, onExport }: { data: SalaryDueData; onExport: (r
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Base Salary</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Adv. Balance</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deduction</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Inv. Due</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Deductions</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net to Pay</th>
                   <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {unpaidEmployees.map(e => (
-                  <tr key={e.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold">{e.name}</p>
-                      {e.designation && <p className="text-xs text-muted-foreground">{e.designation}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-right">Rs {fmt(e.baseSalary)}</td>
-                    <td className="px-4 py-3 text-right text-amber-600">{e.outstandingAdvance > 0 ? `Rs ${fmt(e.outstandingAdvance)}` : <span className="text-emerald-600 text-xs">None</span>}</td>
-                    <td className="px-4 py-3 text-right text-red-500">{e.advanceDeducted > 0 ? `— Rs ${fmt(e.advanceDeducted)}` : "—"}</td>
-                    <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">Rs {fmt(e.netSalary)}</td>
-                    <td className="px-4 py-3 text-center">
-                      {e.isProcessed
-                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Processed</span>
-                        : <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Not Started</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
+                {unpaidEmployees.map(e => {
+                  const totalDed = e.advanceDeducted + e.absenceDeduction + e.invoiceDeducted;
+                  return (
+                    <tr key={e.id} className="hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{e.name}</p>
+                        {e.designation && <p className="text-xs text-muted-foreground">{e.designation}</p>}
+                        {e.note && <p className="text-xs text-muted-foreground italic">{e.note}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-right">Rs {fmt(e.baseSalary)}</td>
+                      <td className="px-4 py-3 text-right text-amber-600">{e.outstandingAdvance > 0 ? `Rs ${fmt(e.outstandingAdvance)}` : <span className="text-emerald-600 text-xs">—</span>}</td>
+                      <td className="px-4 py-3 text-right text-purple-600">{e.invoiceOutstanding > 0 ? `Rs ${fmt(e.invoiceOutstanding)}` : <span className="text-muted-foreground text-xs">—</span>}</td>
+                      <td className="px-4 py-3 text-right">
+                        {totalDed > 0 ? (
+                          <span className="text-red-500">
+                            — Rs {fmt(totalDed)}
+                            <span className="block text-xs text-muted-foreground">
+                              {e.advanceDeducted > 0 && `Adv: ${fmt(e.advanceDeducted)}`}
+                              {e.absenceDeduction > 0 && ` · Abs(${e.absenceDays}d): ${fmt(e.absenceDeduction)}`}
+                              {e.invoiceDeducted > 0 && ` · Inv: ${fmt(e.invoiceDeducted)}`}
+                            </span>
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">Rs {fmt(e.netSalary)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {e.isProcessed
+                          ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Processed</span>
+                          : <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Not Started</span>
+                        }
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot className="border-t-2 border-border bg-muted/20">
                 <tr>
                   <td className="px-4 py-3 font-bold">Total Pending</td>
                   <td className="px-4 py-3 text-right font-bold">Rs {fmt(unpaidEmployees.reduce((s, e) => s + e.baseSalary, 0))}</td>
                   <td />
-                  <td className="px-4 py-3 text-right font-bold text-red-500">— Rs {fmt(unpaidEmployees.reduce((s, e) => s + e.advanceDeducted, 0))}</td>
+                  <td />
+                  <td className="px-4 py-3 text-right font-bold text-red-500">— Rs {fmt(unpaidEmployees.reduce((s, e) => s + e.advanceDeducted + e.absenceDeduction + e.invoiceDeducted, 0))}</td>
                   <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">Rs {fmt(data.summary.totalPending)}</td>
                   <td />
                 </tr>

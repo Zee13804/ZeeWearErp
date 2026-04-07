@@ -1253,12 +1253,15 @@ const getSalaryDueReport = async (req, res) => {
     const month = parseInt(req.query.month) || (now.getMonth() + 1);
     const year  = parseInt(req.query.year)  || now.getFullYear();
 
-    // All active employees with their salary records for this month
     const employees = await prisma.employee.findMany({
       where: { isActive: true },
       include: {
         salaryRecords: { where: { month, year } },
         advances: true,
+        linkedInvoices: {
+          where: { status: { not: 'paid' } },
+          select: { id: true, totalAmount: true, paidAmount: true },
+        },
       },
       orderBy: { name: 'asc' },
     });
@@ -1266,8 +1269,12 @@ const getSalaryDueReport = async (req, res) => {
     const report = employees.map(emp => {
       const salaryRecord = emp.salaryRecords[0] || null;
       const outstandingAdvance = emp.advances.reduce((s, a) => s + Math.max(0, a.amount - a.repaid), 0);
+      const invoiceOutstanding = emp.linkedInvoices.reduce((s, inv) => s + Math.max(0, inv.totalAmount - inv.paidAmount), 0);
       const baseSalary = salaryRecord ? salaryRecord.baseSalary : emp.monthlySalary;
       const advanceDeducted = salaryRecord ? salaryRecord.advanceDeducted : Math.min(outstandingAdvance, baseSalary);
+      const absenceDays = salaryRecord ? (salaryRecord.absenceDays || 0) : 0;
+      const absenceDeduction = salaryRecord ? (salaryRecord.absenceDeduction || 0) : 0;
+      const invoiceDeducted = salaryRecord ? (salaryRecord.invoiceDeducted || 0) : 0;
       const netSalary = salaryRecord ? salaryRecord.netSalary : Math.max(0, baseSalary - advanceDeducted);
       const isPaid = salaryRecord ? salaryRecord.isPaid : false;
       const isProcessed = !!salaryRecord;
@@ -1279,7 +1286,11 @@ const getSalaryDueReport = async (req, res) => {
         monthlySalary: emp.monthlySalary,
         baseSalary,
         outstandingAdvance: Math.round(outstandingAdvance * 100) / 100,
+        invoiceOutstanding: Math.round(invoiceOutstanding * 100) / 100,
         advanceDeducted: Math.round(advanceDeducted * 100) / 100,
+        absenceDays,
+        absenceDeduction: Math.round(absenceDeduction * 100) / 100,
+        invoiceDeducted: Math.round(invoiceDeducted * 100) / 100,
         netSalary: Math.round(netSalary * 100) / 100,
         isPaid,
         isProcessed,
@@ -1288,11 +1299,12 @@ const getSalaryDueReport = async (req, res) => {
       };
     });
 
-    const totalBase     = report.reduce((s, r) => s + r.baseSalary, 0);
-    const totalDeduct   = report.reduce((s, r) => s + r.advanceDeducted, 0);
-    const totalNet      = report.reduce((s, r) => s + r.netSalary, 0);
-    const totalPaid     = report.filter(r => r.isPaid).reduce((s, r) => s + r.netSalary, 0);
-    const totalPending  = report.filter(r => !r.isPaid).reduce((s, r) => s + r.netSalary, 0);
+    const totalBase        = report.reduce((s, r) => s + r.baseSalary, 0);
+    const totalDeduct      = report.reduce((s, r) => s + r.advanceDeducted + r.absenceDeduction + r.invoiceDeducted, 0);
+    const totalNet         = report.reduce((s, r) => s + r.netSalary, 0);
+    const totalPaid        = report.filter(r => r.isPaid).reduce((s, r) => s + r.netSalary, 0);
+    const totalPending     = report.filter(r => !r.isPaid).reduce((s, r) => s + r.netSalary, 0);
+    const totalInvDue      = report.reduce((s, r) => s + r.invoiceOutstanding, 0);
 
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -1311,6 +1323,7 @@ const getSalaryDueReport = async (req, res) => {
         totalNet: Math.round(totalNet * 100) / 100,
         totalPaid: Math.round(totalPaid * 100) / 100,
         totalPending: Math.round(totalPending * 100) / 100,
+        totalInvoiceDue: Math.round(totalInvDue * 100) / 100,
       },
     });
   } catch (err) {

@@ -421,6 +421,22 @@ const importBackup = async (req, res) => {
       }
     }
 
+    // --- Employees (must come before Invoices so employeeIdMap is populated) ---
+    if (employees && employees.length > 0) {
+      for (const emp of employees) {
+        const existing = await prisma.employee.findFirst({ where: { name: emp.name, phone: emp.phone || undefined } });
+        if (existing) {
+          employeeIdMap[emp.id] = existing.id;
+        } else {
+          const created = await prisma.employee.create({
+            data: { name: emp.name, designation: emp.designation || null, phone: emp.phone || null, monthlySalary: emp.monthlySalary || emp.baseSalary || 0, joinDate: emp.joinDate ? new Date(emp.joinDate) : (emp.joiningDate ? new Date(emp.joiningDate) : null), isActive: emp.isActive !== false },
+          });
+          employeeIdMap[emp.id] = created.id;
+          counts.employees++;
+        }
+      }
+    }
+
     // --- Invoices ---
     if (invoices && invoices.length > 0) {
       for (const inv of invoices) {
@@ -432,8 +448,9 @@ const importBackup = async (req, res) => {
           counts.skipped++;
           continue;
         }
+        const invEmpId = inv.employeeId ? (employeeIdMap[inv.employeeId] || null) : null;
         const created = await prisma.invoice.create({
-          data: { invoiceNo: inv.invoiceNo, customerId: custId, invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(), dueDate: inv.dueDate ? new Date(inv.dueDate) : null, totalAmount: inv.totalAmount || 0, discount: inv.discount || 0, paidAmount: inv.paidAmount || 0, balance: inv.balance || 0, status: inv.status || 'unpaid', note: inv.note || null },
+          data: { invoiceNo: inv.invoiceNo, customerId: custId, employeeId: invEmpId, invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(), dueDate: inv.dueDate ? new Date(inv.dueDate) : null, totalAmount: inv.totalAmount || 0, discount: inv.discount || 0, paidAmount: inv.paidAmount || 0, balance: inv.balance || 0, status: inv.status || 'unpaid', note: inv.note || null },
         });
         invoiceIdMap[inv.id] = created.id;
         counts.invoices++;
@@ -447,22 +464,6 @@ const importBackup = async (req, res) => {
         for (const pmt of pmts) {
           const pmtAccId = accountIdMap[pmt.accountId] || null;
           await prisma.invoicePayment.create({ data: { invoiceId: created.id, accountId: pmtAccId, amount: pmt.amount, date: pmt.date ? new Date(pmt.date) : new Date(), method: pmt.method || null, note: pmt.note || null } });
-        }
-      }
-    }
-
-    // --- Employees ---
-    if (employees && employees.length > 0) {
-      for (const emp of employees) {
-        const existing = await prisma.employee.findFirst({ where: { name: emp.name, cnic: emp.cnic || null } });
-        if (existing) {
-          employeeIdMap[emp.id] = existing.id;
-        } else {
-          const created = await prisma.employee.create({
-            data: { name: emp.name, designation: emp.designation || null, phone: emp.phone || null, cnic: emp.cnic || null, address: emp.address || null, baseSalary: emp.baseSalary || 0, joiningDate: emp.joiningDate ? new Date(emp.joiningDate) : new Date(), isActive: emp.isActive !== false },
-          });
-          employeeIdMap[emp.id] = created.id;
-          counts.employees++;
         }
       }
     }
@@ -489,7 +490,7 @@ const importBackup = async (req, res) => {
         const existing = await prisma.salaryRecord.findFirst({ where: { employeeId: empId, month: sr.month, year: sr.year } });
         if (!existing) {
           await prisma.salaryRecord.create({
-            data: { employeeId: empId, accountId: accId, month: sr.month, year: sr.year, baseSalary: sr.baseSalary || 0, advanceDeducted: sr.advanceDeducted || 0, netSalary: sr.netSalary || 0, isPaid: sr.isPaid || false, paidAt: sr.paidAt ? new Date(sr.paidAt) : null, note: sr.note || null },
+            data: { employeeId: empId, accountId: accId, month: sr.month, year: sr.year, baseSalary: sr.baseSalary || 0, advanceDeducted: sr.advanceDeducted || 0, absenceDays: sr.absenceDays || 0, absenceDeduction: sr.absenceDeduction || 0, invoiceDeducted: sr.invoiceDeducted || 0, netSalary: sr.netSalary || 0, isPaid: sr.isPaid || false, paidAt: sr.paidAt ? new Date(sr.paidAt) : null, note: sr.note || null },
           });
           counts.salaryRecords++;
         }
