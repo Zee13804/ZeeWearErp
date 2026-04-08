@@ -272,6 +272,10 @@ const createSalary = async (req, res) => {
       return rec;
     });
 
+    if (paid) {
+      notifySalaryPaid(salary.employee?.name || '', salary.netSalary).catch(() => {});
+    }
+
     return res.status(201).json({ message: 'Salary record created', salary });
   } catch (err) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Salary record for this month already exists' });
