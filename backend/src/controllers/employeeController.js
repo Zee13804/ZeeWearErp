@@ -246,6 +246,29 @@ const createSalary = async (req, res) => {
         }
       }
 
+      if (invDeducted > 0) {
+        const empInvoices = await tx.invoice.findMany({
+          where: { employeeId: eid },
+          orderBy: { invoiceDate: 'asc' },
+        });
+        const pendingInvoices = empInvoices.filter(inv => inv.paidAmount < inv.totalAmount);
+        let remaining = invDeducted;
+        for (const inv of pendingInvoices) {
+          if (remaining <= 0) break;
+          const unpaid = inv.totalAmount - inv.paidAmount;
+          const toApply = Math.min(unpaid, remaining);
+          const newPaid = inv.paidAmount + toApply;
+          await tx.invoice.update({
+            where: { id: inv.id },
+            data: {
+              paidAmount: newPaid,
+              status: newPaid >= inv.totalAmount ? 'paid' : 'partial',
+            },
+          });
+          remaining -= toApply;
+        }
+      }
+
       return rec;
     });
 
