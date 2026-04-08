@@ -356,7 +356,7 @@ const importBackup = async (req, res) => {
         const catId = expenseCategoryIdMap[e.categoryId] || null;
         if (e.billImage && imageFiles[e.billImage]) saveBase64Image(e.billImage, imageFiles[e.billImage]);
         await prisma.expense.create({
-          data: { accountId: accId, categoryId: catId, amount: e.amount, description: e.description || null, billImage: e.billImage || null, date: e.date ? new Date(e.date) : new Date() },
+          data: { accountId: accId, categoryId: catId, amount: e.amount, description: e.description || null, billImage: e.billImage || null, expenseDate: e.expenseDate ? new Date(e.expenseDate) : (e.date ? new Date(e.date) : new Date()) },
         });
         counts.expenses++;
       }
@@ -370,7 +370,7 @@ const importBackup = async (req, res) => {
           supplierIdMap[s.id] = existing.id;
         } else {
           const created = await prisma.supplier.create({
-            data: { name: s.name, phone: s.phone || null, address: s.address || null, balance: s.balance || 0 },
+            data: { name: s.name, phone: s.phone || null, address: s.address || null },
           });
           supplierIdMap[s.id] = created.id;
           counts.suppliers++;
@@ -385,7 +385,7 @@ const importBackup = async (req, res) => {
         const accId = accountIdMap[sp.accountId] || null;
         if (!suppId) continue;
         const created = await prisma.supplierPurchase.create({
-          data: { supplierId: suppId, accountId: accId, totalAmount: sp.totalAmount || 0, paidAmount: sp.paidAmount || 0, balance: sp.balance || 0, date: sp.date ? new Date(sp.date) : new Date(), description: sp.description || null },
+          data: { supplierId: suppId, totalAmount: sp.totalAmount || 0, purchaseDate: sp.purchaseDate ? new Date(sp.purchaseDate) : (sp.date ? new Date(sp.date) : new Date()), description: sp.description || null, invoiceNo: sp.invoiceNo || null },
         });
         // Items
         if (supplierPurchaseItems) {
@@ -399,7 +399,7 @@ const importBackup = async (req, res) => {
           const pmts = supplierPayments.filter(p => p.purchaseId === sp.id);
           for (const pmt of pmts) {
             const pmtAccId = accountIdMap[pmt.accountId] || null;
-            await prisma.supplierPayment.create({ data: { purchaseId: created.id, accountId: pmtAccId, amount: pmt.amount, date: pmt.date ? new Date(pmt.date) : new Date(), note: pmt.note || null } });
+            await prisma.supplierPayment.create({ data: { supplierId: suppId, accountId: pmtAccId, amount: pmt.amount, paymentDate: pmt.paymentDate ? new Date(pmt.paymentDate) : (pmt.date ? new Date(pmt.date) : new Date()), note: pmt.note || null } });
           }
         }
       }
@@ -413,7 +413,7 @@ const importBackup = async (req, res) => {
           customerIdMap[c.id] = existing.id;
         } else {
           const created = await prisma.customer.create({
-            data: { name: c.name, phone: c.phone || null, address: c.address || null, balance: c.balance || 0 },
+            data: { name: c.name, phone: c.phone || null, address: c.address || null },
           });
           customerIdMap[c.id] = created.id;
           counts.customers++;
@@ -450,20 +450,20 @@ const importBackup = async (req, res) => {
         }
         const invEmpId = inv.employeeId ? (employeeIdMap[inv.employeeId] || null) : null;
         const created = await prisma.invoice.create({
-          data: { invoiceNo: inv.invoiceNo, customerId: custId, employeeId: invEmpId, invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(), dueDate: inv.dueDate ? new Date(inv.dueDate) : null, totalAmount: inv.totalAmount || 0, discount: inv.discount || 0, paidAmount: inv.paidAmount || 0, balance: inv.balance || 0, status: inv.status || 'unpaid', note: inv.note || null },
+          data: { invoiceNo: inv.invoiceNo, customerId: custId, employeeId: invEmpId, invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(), dueDate: inv.dueDate ? new Date(inv.dueDate) : null, totalAmount: inv.totalAmount || 0, discount: inv.discount || 0, paidAmount: inv.paidAmount || 0, status: inv.status || 'unpaid', note: inv.note || null },
         });
         invoiceIdMap[inv.id] = created.id;
         counts.invoices++;
         // Items
         const items = (inv.items || invoiceItems?.filter(i => i.invoiceId === inv.id) || []);
         for (const item of items) {
-          await prisma.invoiceItem.create({ data: { invoiceId: created.id, description: item.description, quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, sku: item.sku || null } });
+          await prisma.invoiceItem.create({ data: { invoiceId: created.id, description: item.description, quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0 } });
         }
         // Payments
         const pmts = (inv.payments || invoicePayments?.filter(p => p.invoiceId === inv.id) || []);
         for (const pmt of pmts) {
           const pmtAccId = accountIdMap[pmt.accountId] || null;
-          await prisma.invoicePayment.create({ data: { invoiceId: created.id, accountId: pmtAccId, amount: pmt.amount, date: pmt.date ? new Date(pmt.date) : new Date(), method: pmt.method || null, note: pmt.note || null } });
+          await prisma.invoicePayment.create({ data: { invoiceId: created.id, accountId: pmtAccId, amount: pmt.amount, paymentDate: pmt.paymentDate ? new Date(pmt.paymentDate) : (pmt.date ? new Date(pmt.date) : new Date()), note: pmt.note || null } });
         }
       }
     }
@@ -475,7 +475,7 @@ const importBackup = async (req, res) => {
         const accId = accountIdMap[adv.accountId] || null;
         if (!empId) continue;
         await prisma.advance.create({
-          data: { employeeId: empId, accountId: accId, amount: adv.amount, repaid: adv.repaid || 0, balance: adv.balance || 0, date: adv.date ? new Date(adv.date) : new Date(), reason: adv.reason || null, status: adv.status || 'outstanding' },
+          data: { employeeId: empId, accountId: accId, amount: adv.amount, repaid: adv.repaid || 0, advanceDate: adv.advanceDate ? new Date(adv.advanceDate) : (adv.date ? new Date(adv.date) : new Date()), reason: adv.reason || null },
         });
         counts.advances++;
       }
