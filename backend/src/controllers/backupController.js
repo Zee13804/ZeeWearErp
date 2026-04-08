@@ -315,7 +315,7 @@ const importBackup = async (req, res) => {
           accountIdMap[acc.id] = existing.id;
         } else {
           const created = await prisma.account.create({
-            data: { name: acc.name, type: acc.type, openingBalance: acc.openingBalance || 0, balance: acc.balance || 0, description: acc.description || null, isActive: acc.isActive !== false },
+            data: { name: acc.name, type: acc.type, openingBalance: acc.openingBalance || 0, description: acc.description || null, isActive: acc.isActive !== false },
           });
           accountIdMap[acc.id] = created.id;
           counts.accounts++;
