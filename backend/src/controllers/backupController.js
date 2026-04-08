@@ -231,7 +231,7 @@ const importBackup = async (req, res) => {
     if (articles && articles.length > 0) {
       for (const art of articles) {
         try {
-          const existing = await prisma.article.findFirst({ where: { name: art.name, collection: art.collection || '' } });
+          const existing = await prisma.article.findFirst({ where: { name: art.name, collection: art.collection || '', season: art.season || '', fabric: art.fabric || '' } });
           if (existing) {
             if (art.id) articleIdMap[art.id] = existing.id;
             counts.skipped++;
