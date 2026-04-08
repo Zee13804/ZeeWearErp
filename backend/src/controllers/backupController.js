@@ -231,11 +231,7 @@ const importBackup = async (req, res) => {
     if (articles && articles.length > 0) {
       for (const art of articles) {
         try {
-          const existing = await prisma.article.findFirst({ where: { name: art.name, collection: art.collection || '', season: art.season || '', fabric: art.fabric || '' } });
-          if (existing) {
-            if (art.id) articleIdMap[art.id] = existing.id;
-            counts.skipped++;
-          } else {
+          {
             const newArticle = await prisma.article.create({
               data: { name: art.name, collection: art.collection || '', fabric: art.fabric || '', season: art.season || '', category: art.category || 'General', description: art.description || null, costPrice: art.costPrice || null, sellingPrice: art.sellingPrice || null, isActive: art.isActive !== false },
             });
