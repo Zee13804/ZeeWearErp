@@ -230,35 +230,45 @@ const importBackup = async (req, res) => {
     // --- Articles + Variants ---
     if (articles && articles.length > 0) {
       for (const art of articles) {
-        const existing = await prisma.article.findFirst({ where: { name: art.name, collection: art.collection } });
-        if (existing) {
-          if (art.id) articleIdMap[art.id] = existing.id;
-          counts.skipped++;
-        } else {
-          const newArticle = await prisma.article.create({
-            data: { name: art.name, collection: art.collection, fabric: art.fabric, season: art.season, category: art.category || 'General', description: art.description || null, costPrice: art.costPrice || null, sellingPrice: art.sellingPrice || null, isActive: art.isActive !== false },
-          });
-          if (art.id) articleIdMap[art.id] = newArticle.id;
-          counts.articles++;
-          if (art.variants && art.variants.length > 0) {
-            for (const v of art.variants) {
-              const skuExists = await prisma.variant.findFirst({ where: { sku: v.sku } });
-              if (!skuExists) {
-                let importBarcode = v.barcode || null;
-                if (importBarcode) {
-                  const bcExists = await prisma.variant.findFirst({ where: { barcode: importBarcode } });
-                  if (bcExists) importBarcode = null;
+        try {
+          const existing = await prisma.article.findFirst({ where: { name: art.name, collection: art.collection || '' } });
+          if (existing) {
+            if (art.id) articleIdMap[art.id] = existing.id;
+            counts.skipped++;
+          } else {
+            const newArticle = await prisma.article.create({
+              data: { name: art.name, collection: art.collection || '', fabric: art.fabric || '', season: art.season || '', category: art.category || 'General', description: art.description || null, costPrice: art.costPrice || null, sellingPrice: art.sellingPrice || null, isActive: art.isActive !== false },
+            });
+            if (art.id) articleIdMap[art.id] = newArticle.id;
+            counts.articles++;
+            if (art.variants && art.variants.length > 0) {
+              for (const v of art.variants) {
+                try {
+                  const skuExists = await prisma.variant.findFirst({ where: { sku: v.sku } });
+                  if (!skuExists) {
+                    let importBarcode = v.barcode || null;
+                    if (importBarcode) {
+                      const bcExists = await prisma.variant.findFirst({ where: { barcode: importBarcode } });
+                      if (bcExists) importBarcode = null;
+                    }
+                    const newVariant = await prisma.variant.create({
+                      data: { sku: v.sku, size: v.size || '', type: v.type || '', color: v.color || '', quantity: v.quantity || 0, barcode: importBarcode, isActive: v.isActive !== false, articleId: newArticle.id },
+                    });
+                    if (v.id) variantIdMap[v.id] = newVariant.id;
+                    counts.variants++;
+                  } else {
+                    if (v.id) variantIdMap[v.id] = skuExists.id;
+                  }
+                } catch (vErr) {
+                  console.error(`Variant skip (sku=${v.sku}):`, vErr.message);
+                  counts.skipped++;
                 }
-                const newVariant = await prisma.variant.create({
-                  data: { sku: v.sku, size: v.size, type: v.type, color: v.color, quantity: v.quantity || 0, barcode: importBarcode, isActive: v.isActive !== false, articleId: newArticle.id },
-                });
-                if (v.id) variantIdMap[v.id] = newVariant.id;
-                counts.variants++;
-              } else {
-                if (v.id) variantIdMap[v.id] = skuExists.id;
               }
             }
           }
+        } catch (artErr) {
+          console.error(`Article skip (name=${art.name}):`, artErr.message);
+          counts.skipped++;
         }
       }
     }
