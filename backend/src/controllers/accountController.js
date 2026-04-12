@@ -293,7 +293,7 @@ const createTransfer = async (req, res) => {
         date: date ? new Date(date) : new Date(),
       },
     });
-    notifyTransfer(fromAcc?.name || '', toAcc?.name || '', parseFloat(amount), note).catch(() => {});
+    notifyTransfer(fromAcc?.name || '', toAcc?.name || '', parseFloat(amount), note, parseInt(fromAccountId), parseInt(toAccountId)).catch(() => {});
     return res.status(201).json({ message: 'Transfer recorded', transfer });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create transfer', details: err.message });

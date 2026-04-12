@@ -109,7 +109,7 @@ const getLedger = async (req, res) => {
     const accFilter = accountId ? { accountId: parseInt(accountId) } : {};
     const range = makeRange();
 
-    const [invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours] = await Promise.all([
+    const [invoicePayments, expenses, supplierPayments, transfersIn, transfersOut, advances, salaries, labours, vendorPayments, courierPayments] = await Promise.all([
       prisma.invoicePayment.findMany({
         where: { ...accFilter, ...(range ? { paymentDate: range } : {}) },
         include: { invoice: { select: { invoiceNo: true, customer: { select: { name: true } } } }, account: { select: { name: true } } },
@@ -142,6 +142,14 @@ const getLedger = async (req, res) => {
         where: { ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { paymentDate: range } : {}) },
         include: { account: { select: { name: true } } },
       }),
+      prisma.outsourceVendorPayment.findMany({
+        where: { ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { paymentDate: range } : {}) },
+        include: { account: { select: { name: true } }, job: { select: { collection: true } } },
+      }),
+      prisma.courierPayment.findMany({
+        where: { ...(accountId ? { accountId: parseInt(accountId) } : {}), ...(range ? { paymentDate: range } : {}) },
+        include: { account: { select: { name: true } } },
+      }),
     ]);
 
     const entries = [];
@@ -169,6 +177,14 @@ const getLedger = async (req, res) => {
     }
     for (const l of labours) {
       entries.push({ date: l.paymentDate, type: 'OUT', category: 'Labour Payment', account: l.account?.name || '—', description: `Labour – ${l.workerName}`, amount: l.amount });
+    }
+    for (const v of vendorPayments) {
+      const label = v.type === 'advance' ? 'Vendor Advance' : 'Vendor Payment';
+      entries.push({ date: v.paymentDate, type: 'OUT', category: label, account: v.account?.name || '—', description: `${v.vendorName}${v.job?.collection ? ` (${v.job.collection})` : ''}`, amount: v.amount });
+    }
+    for (const c of courierPayments) {
+      const src = c.source === 'leopard' ? 'Leopard' : 'LAAM';
+      entries.push({ date: c.paymentDate, type: 'IN', category: 'Courier Receipt', account: c.account?.name || '—', description: `${src}${c.paymentRef ? ` (Ref: ${c.paymentRef})` : ''}`, amount: c.netReceived });
     }
 
     entries.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1192,14 +1208,14 @@ const getProductionJobsReport = async (req, res) => {
       const workEntries = job.workEntries || [];
       const payments = job.vendorPayments || [];
 
-      const totalWorkValue = workEntries.reduce((s, e) => s + e.amount, 0);
+      const totalWorkValue = workEntries.reduce((s, e) => s + e.totalCost, 0);
       const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
       const outstanding = totalWorkValue - totalPaid;
 
       const vendorSummary = {};
       for (const e of workEntries) {
         if (!vendorSummary[e.vendorName]) vendorSummary[e.vendorName] = { workValue: 0, paid: 0 };
-        vendorSummary[e.vendorName].workValue += e.amount;
+        vendorSummary[e.vendorName].workValue += e.totalCost;
       }
       for (const p of payments) {
         if (!vendorSummary[p.vendorName]) vendorSummary[p.vendorName] = { workValue: 0, paid: 0 };

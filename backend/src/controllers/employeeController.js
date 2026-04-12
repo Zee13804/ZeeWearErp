@@ -123,7 +123,7 @@ const createAdvance = async (req, res) => {
       },
       include: { employee: { select: { id: true, name: true } } },
     });
-    notifyAdvance(advance.employee?.name || '', advance.amount).catch(() => {});
+    notifyAdvance(advance.employee?.name || '', advance.amount, '', parseInt(accountId)).catch(() => {});
     return res.status(201).json({ message: 'Advance recorded', advance });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create advance', details: err.message });
@@ -273,7 +273,7 @@ const createSalary = async (req, res) => {
     });
 
     if (paid) {
-      notifySalaryPaid(salary.employee?.name || '', salary.netSalary).catch(() => {});
+      notifySalaryPaid(salary.employee?.name || '', salary.netSalary, '', parseInt(accountId)).catch(() => {});
     }
 
     return res.status(201).json({ message: 'Salary record created', salary });
@@ -339,7 +339,7 @@ const markSalaryPaid = async (req, res) => {
       },
       include: { employee: { select: { name: true } } },
     });
-    notifySalaryPaid(salary.employee?.name || '', salary.netSalary).catch(() => {});
+    notifySalaryPaid(salary.employee?.name || '', salary.netSalary, '', parseInt(accountId)).catch(() => {});
     return res.json({ message: 'Salary marked as paid', salary });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update salary', details: err.message });

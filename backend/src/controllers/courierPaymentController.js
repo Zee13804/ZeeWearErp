@@ -71,7 +71,7 @@ const createPayment = async (req, res) => {
       include: { account: { select: { id: true, name: true } } },
     });
 
-    notifyCourierPayment(source, net, charge).catch(() => {});
+    notifyCourierPayment(source, net, charge, payment.account?.name || '', payment.account?.id).catch(() => {});
     return res.status(201).json({ message: 'Courier payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create courier payment', details: err.message });

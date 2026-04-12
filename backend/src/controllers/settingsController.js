@@ -16,6 +16,7 @@ const KEY_MAP = {
   notifySalaryPaid:      'notif_salary_paid',
   notifyAdvance:         'notif_advance_given',
   notifyCourierPayment:  'notif_courier_payment',
+  notifyVendorPayment:   'notif_vendor_payment',
   notifyDailyReport:     'notif_daily_report',
 };
 
@@ -39,7 +40,7 @@ const getSettings = async (req, res) => {
       if (camel === 'telegramBotToken' && val) {
         val = val.replace(/^(.{6}).*(.{4})$/, '$1****$2');
       }
-      if (['notifyInvoiceCreated','notifyInvoicePayment','notifyTransfer','notifyExpense','notifySupplierPayment','notifySalaryPaid','notifyAdvance','notifyCourierPayment','notifyDailyReport'].includes(camel)) {
+      if (['notifyInvoiceCreated','notifyInvoicePayment','notifyTransfer','notifyExpense','notifySupplierPayment','notifySalaryPaid','notifyAdvance','notifyCourierPayment','notifyVendorPayment','notifyDailyReport'].includes(camel)) {
         result[camel] = val !== 'false';
       } else {
         result[camel] = val;

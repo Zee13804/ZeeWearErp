@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { notifyVendorPayment } = require('../services/notificationService');
 
 // ── Production Jobs ──────────────────────────────────────
 
@@ -309,20 +310,24 @@ const createVendorPayment = async (req, res) => {
       return res.status(400).json({ error: 'Amount must be a positive number' });
     }
 
-    const payment = await prisma.outsourceVendorPayment.create({
-      data: {
-        jobId: parseInt(jobId),
-        vendorName: vendorName.trim(),
-        amount: paymentAmount,
-        type: type === 'advance' ? 'advance' : 'payment',
-        accountId: parseInt(accountId),
-        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-        notes: notes || null,
-      },
-      include: {
-        account: { select: { id: true, name: true } },
-      },
-    });
+    const [payment, job] = await Promise.all([
+      prisma.outsourceVendorPayment.create({
+        data: {
+          jobId: parseInt(jobId),
+          vendorName: vendorName.trim(),
+          amount: paymentAmount,
+          type: type === 'advance' ? 'advance' : 'payment',
+          accountId: parseInt(accountId),
+          paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+          notes: notes || null,
+        },
+        include: {
+          account: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.productionJob.findUnique({ where: { id: parseInt(jobId) }, select: { collection: true } }),
+    ]);
+    notifyVendorPayment(vendorName.trim(), paymentAmount, type === 'advance' ? 'advance' : 'payment', job?.collection || '', payment.account?.name || '', payment.account?.id).catch(() => {});
     return res.status(201).json({ message: 'Vendor payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to record vendor payment', details: err.message });

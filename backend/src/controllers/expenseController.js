@@ -95,7 +95,7 @@ const createExpense = async (req, res) => {
         account: { select: { id: true, name: true } },
       },
     });
-    notifyExpense(expense.amount, expense.description, expense.category?.name || '', expense.account?.name || '').catch(() => {});
+    notifyExpense(expense.amount, expense.description, expense.category?.name || '', expense.account?.name || '', expense.account?.id).catch(() => {});
     return res.status(201).json({ message: 'Expense recorded', expense });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create expense', details: err.message });
