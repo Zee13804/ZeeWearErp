@@ -6,7 +6,9 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
-    "setup": "node backend/setup.js"
+    "setup": "node backend/setup.js",
+    "update": "node backend/update.js",
+    "seed:dev": "node backend/seed-dev-user.js"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
