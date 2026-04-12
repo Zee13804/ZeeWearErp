@@ -134,7 +134,8 @@ export default function JobDetailPage() {
       ]);
       setJob(jRes.job);
       setAccounts(accRes.accounts || []);
-    } catch {
+    } catch (err: unknown) {
+      console.error("[JobDetail] Load error:", err);
       showToast("Failed to load job details", "error");
     } finally {
       setLoading(false);
@@ -230,7 +231,7 @@ export default function JobDetailPage() {
     );
   }
 
-  const vendorNames = Array.from(new Set(job.workEntries.map(e => e.vendorName)));
+  const vendorNames = Array.from(new Set((job.workEntries || []).map(e => e.vendorName)));
 
   return (
     <DashboardLayout>
@@ -269,21 +270,21 @@ export default function JobDetailPage() {
               <p className="text-lg font-bold text-orange-700 dark:text-orange-400 mt-1">
                 Rs {fmt(job.totalOutsourceCost)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{job.workEntries.length} entries</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{(job.workEntries || []).length} entries</p>
             </div>
             <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
               <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Material Purchases</p>
               <p className="text-lg font-bold text-blue-700 dark:text-blue-400 mt-1">
                 Rs {fmt(job.totalMaterialCost)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{job.linkedPurchases.length} purchases</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{(job.linkedPurchases || []).length} purchases</p>
             </div>
             <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
               <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Vendor Paid</p>
               <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-1">
                 Rs {fmt(job.totalVendorPaid)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{job.vendorPayments.length} payments</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{(job.vendorPayments || []).length} payments</p>
             </div>
             <div className={`rounded-lg border-2 p-4 ${
               job.vendorBalance <= 0
@@ -304,7 +305,7 @@ export default function JobDetailPage() {
         </div>
 
         {/* Vendor Payment Ledger */}
-        {job.vendorSummary.length > 0 && (
+        {(job.vendorSummary || []).length > 0 && (
           <div className="bg-background rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -329,7 +330,7 @@ export default function JobDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {job.vendorSummary.map(v => (
+                  {(job.vendorSummary || []).map(v => (
                     <tr key={v.vendorName} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2.5 px-3 font-medium text-foreground">{v.vendorName}</td>
                       <td className="py-2.5 px-3 text-right text-orange-600 font-semibold">Rs {fmt(v.totalWork)}</td>
@@ -361,11 +362,11 @@ export default function JobDetailPage() {
             </div>
 
             {/* Payment history */}
-            {job.vendorPayments.length > 0 && (
+            {(job.vendorPayments || []).length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground font-medium mb-2">Payment History</p>
                 <div className="space-y-1.5">
-                  {job.vendorPayments.map(p => (
+                  {(job.vendorPayments || []).map(p => (
                     <div key={p.id} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
@@ -408,7 +409,7 @@ export default function JobDetailPage() {
               <Wrench className="w-4 h-4 text-orange-600" /> Outsource Work Entries
             </h2>
             <div className="flex gap-2">
-              {job.vendorSummary.some(v => v.balance > 0) && (
+              {(job.vendorSummary || []).some(v => v.balance > 0) && (
                 <Button size="sm" variant="outline" onClick={() => setShowPaymentForm(true)}>
                   <Wallet className="w-4 h-4 mr-1" /> Record Payment
                 </Button>
@@ -419,7 +420,7 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {job.workEntries.length === 0 ? (
+          {(job.workEntries || []).length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Wrench className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No work entries yet. Add the first outsource work entry.</p>
@@ -439,7 +440,7 @@ export default function JobDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {job.workEntries.map(entry => (
+                  {(job.workEntries || []).map(entry => (
                     <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-medium">
@@ -491,7 +492,7 @@ export default function JobDetailPage() {
             </a>
           </div>
 
-          {job.linkedPurchases.length === 0 ? (
+          {(job.linkedPurchases || []).length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No material purchases linked to this collection.</p>
@@ -499,7 +500,7 @@ export default function JobDetailPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {job.linkedPurchases.map(purchase => (
+              {(job.linkedPurchases || []).map(purchase => (
                 <div key={purchase.id} className="border border-border rounded-lg overflow-hidden">
                   <button
                     onClick={() => setExpandedPurchase(expandedPurchase === purchase.id ? null : purchase.id)}

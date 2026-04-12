@@ -1198,8 +1198,11 @@ const getProductionJobsReport = async (req, res) => {
     const jobs = await prisma.productionJob.findMany({
       where,
       include: {
-        workEntries: true,
-        vendorPayments: true,
+        workEntries: { orderBy: { workDate: 'asc' } },
+        vendorPayments: {
+          include: { account: { select: { name: true } } },
+          orderBy: { paymentDate: 'asc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1214,12 +1217,14 @@ const getProductionJobsReport = async (req, res) => {
 
       const vendorSummary = {};
       for (const e of workEntries) {
-        if (!vendorSummary[e.vendorName]) vendorSummary[e.vendorName] = { workValue: 0, paid: 0 };
+        if (!vendorSummary[e.vendorName]) vendorSummary[e.vendorName] = { workValue: 0, paid: 0, workEntries: [], payments: [] };
         vendorSummary[e.vendorName].workValue += e.totalCost;
+        vendorSummary[e.vendorName].workEntries.push({ workType: e.workType, quantity: e.quantity, ratePerPiece: e.ratePerPiece, totalCost: e.totalCost, date: e.workDate });
       }
       for (const p of payments) {
-        if (!vendorSummary[p.vendorName]) vendorSummary[p.vendorName] = { workValue: 0, paid: 0 };
+        if (!vendorSummary[p.vendorName]) vendorSummary[p.vendorName] = { workValue: 0, paid: 0, workEntries: [], payments: [] };
         vendorSummary[p.vendorName].paid += p.amount;
+        vendorSummary[p.vendorName].payments.push({ amount: p.amount, type: p.type, accountName: p.account?.name || '—', date: p.paymentDate, notes: p.notes });
       }
 
       return {
@@ -1237,6 +1242,8 @@ const getProductionJobsReport = async (req, res) => {
           workValue: v.workValue,
           paid: v.paid,
           balance: v.workValue - v.paid,
+          workEntries: v.workEntries,
+          payments: v.payments,
         })),
       };
     });

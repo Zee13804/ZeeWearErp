@@ -1534,22 +1534,33 @@ function SupplierLedgerReport({ data, onExport }: { data: SupplierLedgerData; on
   );
 }
 
+interface VendorPaymentRecord { amount: number; type: string; accountName: string; date: string; notes?: string | null; }
+interface VendorWorkEntry { workType: string; quantity: number; ratePerPiece: number; totalCost: number; date: string; }
 interface ProductionJobsData {
   jobs: Array<{
     id: number; collection: string; description: string | null; status: string; createdAt: string;
     totalWorkValue: number; totalPaid: number; outstanding: number; vendorCount: number;
-    vendors: Array<{ name: string; workValue: number; paid: number; balance: number }>;
+    vendors: Array<{ name: string; workValue: number; paid: number; balance: number; workEntries: VendorWorkEntry[]; payments: VendorPaymentRecord[] }>;
   }>;
   summary: { totalJobs: number; totalWorkValue: number; totalPaid: number; totalOutstanding: number };
 }
 
 function ProductionJobsReport({ data, onExport }: { data: ProductionJobsData; onExport: (rows: unknown[][], file: string) => void }) {
   const [expandedJob, setExpandedJob] = React.useState<number | null>(null);
+  const [expandedVendor, setExpandedVendor] = React.useState<string | null>(null);
   if (!data?.jobs) return <div className="py-16 text-center text-muted-foreground">No data available.</div>;
 
-  const csvRows = [
+  const csvRows: unknown[][] = [
     ["Collection", "Description", "Status", "Date", "Work Value", "Paid", "Outstanding", "Vendors"],
     ...data.jobs.map(j => [j.collection, j.description || "", j.status, new Date(j.createdAt).toLocaleDateString(), j.totalWorkValue, j.totalPaid, j.outstanding, j.vendorCount]),
+    [],
+    ["—— Vendor Payment Detail ——"],
+    ["Collection", "Vendor", "Payment Type", "Amount", "Account", "Date", "Notes"],
+    ...data.jobs.flatMap(j =>
+      (j.vendors || []).flatMap(v =>
+        (v.payments || []).map(p => [j.collection, v.name, p.type === "advance" ? "Advance" : "Payment", p.amount, p.accountName, new Date(p.date).toLocaleDateString(), p.notes || ""])
+      )
+    ),
   ];
 
   return (
@@ -1569,7 +1580,7 @@ function ProductionJobsReport({ data, onExport }: { data: ProductionJobsData; on
         <div className="space-y-2">
           {data.jobs.map(job => (
             <div key={job.id} className="rounded-xl border border-border overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 cursor-pointer" onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}>
+              <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 cursor-pointer" onClick={() => { setExpandedJob(expandedJob === job.id ? null : job.id); setExpandedVendor(null); }}>
                 <div className="flex items-center gap-3">
                   <div>
                     <p className="font-semibold">{job.collection}</p>
@@ -1584,28 +1595,76 @@ function ProductionJobsReport({ data, onExport }: { data: ProductionJobsData; on
                   <div className="text-right"><p className="text-xs text-muted-foreground">Outstanding</p><p className={`font-bold ${job.outstanding > 0 ? "text-amber-600" : "text-emerald-600"}`}>Rs {fmt(job.outstanding)}</p></div>
                 </div>
               </div>
-              {expandedJob === job.id && job.vendors.length > 0 && (
+              {expandedJob === job.id && (job.vendors || []).length > 0 && (
                 <div className="border-t border-border bg-muted/10">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 border-b border-border">
-                      <tr>
-                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Vendor</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Work Value</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Paid</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {job.vendors.map((v, i) => (
-                        <tr key={i} className="hover:bg-muted/10">
-                          <td className="px-6 py-2 font-medium">{v.name}</td>
-                          <td className="px-4 py-2 text-right">Rs {fmt(v.workValue)}</td>
-                          <td className="px-4 py-2 text-right text-emerald-600">Rs {fmt(v.paid)}</td>
-                          <td className={`px-4 py-2 text-right font-semibold ${v.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>{v.balance === 0 ? <span className="text-xs text-emerald-600">Cleared</span> : `Rs ${fmt(v.balance)}`}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {(job.vendors || []).map((v, i) => {
+                    const vendorKey = `${job.id}-${v.name}`;
+                    const isVendorOpen = expandedVendor === vendorKey;
+                    return (
+                      <div key={i} className="border-b border-border last:border-b-0">
+                        <div
+                          className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/20 cursor-pointer"
+                          onClick={() => setExpandedVendor(isVendorOpen ? null : vendorKey)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{v.name}</span>
+                            {(v.payments || []).length > 0 && (
+                              <span className="text-xs text-muted-foreground">({(v.payments || []).length} payment{(v.payments || []).length !== 1 ? "s" : ""})</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-6 text-sm">
+                            <div className="text-right"><p className="text-xs text-muted-foreground">Work</p><p className="font-medium">Rs {fmt(v.workValue)}</p></div>
+                            <div className="text-right"><p className="text-xs text-muted-foreground">Paid</p><p className="font-medium text-emerald-600">Rs {fmt(v.paid)}</p></div>
+                            <div className="text-right"><p className="text-xs text-muted-foreground">Balance</p><p className={`font-bold text-sm ${v.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>{v.balance === 0 ? "Cleared" : `Rs ${fmt(v.balance)}`}</p></div>
+                          </div>
+                        </div>
+                        {isVendorOpen && (
+                          <div className="bg-background border-t border-border/60 px-4 pb-3 pt-2 space-y-3">
+                            {(v.workEntries || []).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Work Entries</p>
+                                <table className="w-full text-xs">
+                                  <thead><tr className="text-muted-foreground"><th className="text-left pb-1 font-medium">Type</th><th className="text-right pb-1 font-medium">Qty</th><th className="text-right pb-1 font-medium">Rate</th><th className="text-right pb-1 font-medium">Total</th><th className="text-right pb-1 font-medium">Date</th></tr></thead>
+                                  <tbody className="divide-y divide-border/40">
+                                    {(v.workEntries || []).map((we, wi) => (
+                                      <tr key={wi} className="hover:bg-muted/10">
+                                        <td className="py-1"><span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs">{we.workType}</span></td>
+                                        <td className="py-1 text-right text-muted-foreground">{we.quantity}</td>
+                                        <td className="py-1 text-right text-muted-foreground">Rs {fmt(we.ratePerPiece)}</td>
+                                        <td className="py-1 text-right font-semibold">Rs {fmt(we.totalCost)}</td>
+                                        <td className="py-1 text-right text-muted-foreground">{new Date(we.date).toLocaleDateString("en-PK")}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {(v.payments || []).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Payment History</p>
+                                <table className="w-full text-xs">
+                                  <thead><tr className="text-muted-foreground"><th className="text-left pb-1 font-medium">Type</th><th className="text-left pb-1 font-medium">Account</th><th className="text-right pb-1 font-medium">Amount</th><th className="text-right pb-1 font-medium">Date</th></tr></thead>
+                                  <tbody className="divide-y divide-border/40">
+                                    {(v.payments || []).map((p, pi) => (
+                                      <tr key={pi} className="hover:bg-muted/10">
+                                        <td className="py-1"><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${p.type === "advance" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"}`}>{p.type === "advance" ? "Advance" : "Payment"}</span></td>
+                                        <td className="py-1 text-muted-foreground">{p.accountName}</td>
+                                        <td className="py-1 text-right font-semibold text-emerald-600">Rs {fmt(p.amount)}</td>
+                                        <td className="py-1 text-right text-muted-foreground">{new Date(p.date).toLocaleDateString("en-PK")}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {(v.payments || []).length === 0 && (v.workEntries || []).length === 0 && (
+                              <p className="text-xs text-muted-foreground italic">No entries or payments recorded.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
