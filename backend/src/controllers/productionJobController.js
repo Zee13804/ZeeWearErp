@@ -344,6 +344,122 @@ const deleteVendorPayment = async (req, res) => {
   }
 };
 
+// ── Vendor Ledger (cross-job) ─────────────────────────────
+
+const getVendorLedger = async (req, res) => {
+  try {
+    const [allEntries, allPayments] = await Promise.all([
+      prisma.outsourceWorkEntry.findMany({
+        include: {
+          job: { select: { id: true, collection: true, status: true } },
+        },
+        orderBy: { workDate: 'desc' },
+      }),
+      prisma.outsourceVendorPayment.findMany({
+        include: {
+          job: { select: { id: true, collection: true, status: true } },
+          account: { select: { id: true, name: true } },
+        },
+        orderBy: { paymentDate: 'desc' },
+      }),
+    ]);
+
+    // Build per-vendor map with per-job breakdown
+    const vendorMap = {};
+
+    for (const entry of allEntries) {
+      const key = entry.vendorName.toLowerCase().trim();
+      if (!vendorMap[key]) {
+        vendorMap[key] = {
+          vendorName: entry.vendorName,
+          totalWork: 0,
+          totalPaid: 0,
+          totalAdvance: 0,
+          jobs: {},
+        };
+      }
+      vendorMap[key].totalWork += entry.totalCost;
+
+      const jobKey = entry.job.id;
+      if (!vendorMap[key].jobs[jobKey]) {
+        vendorMap[key].jobs[jobKey] = {
+          jobId: entry.job.id,
+          collection: entry.job.collection,
+          status: entry.job.status,
+          totalWork: 0,
+          totalPaid: 0,
+          totalAdvance: 0,
+        };
+      }
+      vendorMap[key].jobs[jobKey].totalWork += entry.totalCost;
+    }
+
+    for (const payment of allPayments) {
+      const key = payment.vendorName.toLowerCase().trim();
+      if (!vendorMap[key]) {
+        vendorMap[key] = {
+          vendorName: payment.vendorName,
+          totalWork: 0,
+          totalPaid: 0,
+          totalAdvance: 0,
+          jobs: {},
+        };
+      }
+      if (payment.type === 'advance') {
+        vendorMap[key].totalAdvance += payment.amount;
+      } else {
+        vendorMap[key].totalPaid += payment.amount;
+      }
+
+      const jobKey = payment.job.id;
+      if (!vendorMap[key].jobs[jobKey]) {
+        vendorMap[key].jobs[jobKey] = {
+          jobId: payment.job.id,
+          collection: payment.job.collection,
+          status: payment.job.status,
+          totalWork: 0,
+          totalPaid: 0,
+          totalAdvance: 0,
+        };
+      }
+      if (payment.type === 'advance') {
+        vendorMap[key].jobs[jobKey].totalAdvance += payment.amount;
+      } else {
+        vendorMap[key].jobs[jobKey].totalPaid += payment.amount;
+      }
+    }
+
+    const vendors = Object.values(vendorMap).map(v => {
+      const totalReceived = v.totalPaid + v.totalAdvance;
+      const balance = v.totalWork - totalReceived;
+      const jobBreakdown = Object.values(v.jobs).map(j => ({
+        ...j,
+        totalReceived: j.totalPaid + j.totalAdvance,
+        balance: j.totalWork - (j.totalPaid + j.totalAdvance),
+      })).sort((a, b) => b.balance - a.balance);
+      return {
+        vendorName: v.vendorName,
+        totalWork: v.totalWork,
+        totalPaid: v.totalPaid,
+        totalAdvance: v.totalAdvance,
+        totalReceived,
+        balance,
+        jobs: jobBreakdown,
+      };
+    });
+
+    // Sort: outstanding balance first, then by vendor name
+    vendors.sort((a, b) => {
+      if (b.balance !== a.balance) return b.balance - a.balance;
+      return a.vendorName.localeCompare(b.vendorName);
+    });
+
+    return res.json({ vendors });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch vendor ledger', details: err.message });
+  }
+};
+
 // ── Collections List (for autocomplete) ─────────────────
 
 const getCollections = async (req, res) => {
@@ -366,5 +482,5 @@ module.exports = {
   getJobs, getJob, createJob, updateJob, deleteJob,
   getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
   getVendorPayments, createVendorPayment, deleteVendorPayment,
-  getCollections,
+  getCollections, getVendorLedger,
 };

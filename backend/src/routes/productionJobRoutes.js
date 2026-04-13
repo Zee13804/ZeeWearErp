@@ -5,13 +5,14 @@ const {
   getJobs, getJob, createJob, updateJob, deleteJob,
   getWorkEntries, createWorkEntry, updateWorkEntry, deleteWorkEntry,
   getVendorPayments, createVendorPayment, deleteVendorPayment,
-  getCollections,
+  getCollections, getVendorLedger,
 } = require('../controllers/productionJobController');
 
 const adminAuth = [authenticate, authorize('admin')];
 const accAuth = [authenticate, authorizeAccounting];
 
 router.get('/collections', ...accAuth, getCollections);
+router.get('/vendor-ledger', ...accAuth, getVendorLedger);
 
 router.get('/', ...accAuth, getJobs);
 router.post('/', ...accAuth, createJob);
