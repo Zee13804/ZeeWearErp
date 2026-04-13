@@ -125,8 +125,7 @@ export default function VendorLedgerPage() {
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Vendor</th>
                   <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium">Work Total</th>
-                  <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium hidden sm:table-cell">Advance</th>
-                  <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium hidden sm:table-cell">Paid</th>
+                  <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium hidden sm:table-cell">Total Paid</th>
                   <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium">Balance Due</th>
                   <th className="py-3 px-4 w-8"></th>
                 </tr>
@@ -156,11 +155,10 @@ export default function VendorLedgerPage() {
                       <td className="py-3 px-4 text-right font-semibold text-orange-600">
                         Rs {fmt(v.totalWork)}
                       </td>
-                      <td className="py-3 px-4 text-right text-blue-600 hidden sm:table-cell">
-                        {v.totalAdvance > 0 ? `Rs ${fmt(v.totalAdvance)}` : <span className="text-muted-foreground">—</span>}
-                      </td>
                       <td className="py-3 px-4 text-right text-emerald-600 hidden sm:table-cell">
-                        {v.totalPaid > 0 ? `Rs ${fmt(v.totalPaid)}` : <span className="text-muted-foreground">—</span>}
+                        {v.totalReceived > 0
+                          ? <span>Rs {fmt(v.totalReceived)}{v.totalAdvance > 0 && <span className="text-xs text-muted-foreground ml-1">({fmt(v.totalAdvance)} adv)</span>}</span>
+                          : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="py-3 px-4 text-right">
                         {v.balance <= 0 ? (
@@ -249,7 +247,6 @@ export default function VendorLedgerPage() {
                 <tr className="bg-muted/30 border-t-2 border-border">
                   <td className="py-3 px-4 font-semibold text-foreground">Total</td>
                   <td className="py-3 px-4 text-right font-bold text-orange-600">Rs {fmt(totalWork)}</td>
-                  <td className="py-3 px-4 hidden sm:table-cell"></td>
                   <td className="py-3 px-4 text-right font-bold text-emerald-600 hidden sm:table-cell">Rs {fmt(totalPaid)}</td>
                   <td className="py-3 px-4 text-right font-bold">
                     <span className={totalBalance <= 0 ? "text-emerald-600" : "text-red-600"}>
