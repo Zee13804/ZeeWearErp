@@ -327,7 +327,7 @@ const createVendorPayment = async (req, res) => {
       }),
       prisma.productionJob.findUnique({ where: { id: parseInt(jobId) }, select: { collection: true } }),
     ]);
-    notifyVendorPayment(vendorName.trim(), paymentAmount, type === 'advance' ? 'advance' : 'payment', job?.collection || '', payment.account?.name || '', payment.account?.id).catch(() => {});
+    notifyVendorPayment(vendorName.trim(), paymentAmount, type === 'advance' ? 'advance' : 'payment', job?.collection || '', payment.account?.name || '', payment.account?.id, notes || null).catch(() => {});
     return res.status(201).json({ message: 'Vendor payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to record vendor payment', details: err.message });

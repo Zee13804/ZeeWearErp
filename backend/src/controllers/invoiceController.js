@@ -279,7 +279,7 @@ const createInvoicePayment = async (req, res) => {
       include: { customer: { select: { name: true } } },
     });
     const account = await prisma.account.findUnique({ where: { id: parseInt(accountId) } });
-    notifyInvoicePayment(updatedInvoice, parseFloat(amount), account?.name || '', parseInt(accountId)).catch(() => {});
+    notifyInvoicePayment(updatedInvoice, parseFloat(amount), account?.name || '', parseInt(accountId), note || null).catch(() => {});
 
     return res.status(201).json({ message: 'Payment recorded', payment });
   } catch (err) {

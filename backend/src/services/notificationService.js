@@ -113,11 +113,12 @@ async function notifyInvoiceCreated(invoice) {
   );
 }
 
-async function notifyInvoicePayment(invoice, amount, accountName, accountId) {
+async function notifyInvoicePayment(invoice, amount, accountName, accountId, note) {
   if (!(await isEventEnabled('invoice_payment'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
+  const customer = invoice.customer?.name || '';
   await sendTelegramMessage(
-    `💰 <b>Payment Received</b>\nInvoice: <b>${invoice.invoiceNo}</b>\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accountName}\nStatus: ${invoice.status}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `💰 <b>Payment Received</b>\nInvoice: <b>${invoice.invoiceNo}</b>${customer ? `\nCustomer: ${customer}` : ''}\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accountName}\nStatus: ${invoice.status}${note ? `\nNote: ${note}` : ''}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 
@@ -143,45 +144,47 @@ async function notifyExpense(amount, description, category, account, accountId) 
   );
 }
 
-async function notifySupplierPayment(supplierName, amount, accountName, accountId) {
+async function notifySupplierPayment(supplierName, amount, accountName, accountId, note) {
   if (!(await isEventEnabled('supplier_payment'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
   await sendTelegramMessage(
-    `📦 <b>Supplier Payment</b>\nSupplier: ${supplierName}\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accountName}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `📦 <b>Supplier Payment</b>\nSupplier: ${supplierName}\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accountName}${note ? `\nNote: ${note}` : ''}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 
-async function notifySalaryPaid(employeeName, netSalary, accountName, accountId) {
+async function notifySalaryPaid(employeeName, netSalary, accountName, accountId, note) {
   if (!(await isEventEnabled('salary_paid'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
+  const accLabel = accountName || accInfo?.name || '—';
   await sendTelegramMessage(
-    `👷 <b>Salary Paid</b>\nEmployee: ${employeeName}\nNet Salary: <b>${fmt(netSalary)}</b>\nAccount: ${accountName || '—'}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `👷 <b>Salary Paid</b>\nEmployee: ${employeeName}\nNet Salary: <b>${fmt(netSalary)}</b>\nAccount: ${accLabel}${note ? `\nNote: ${note}` : ''}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 
-async function notifyAdvance(employeeName, amount, accountName, accountId) {
+async function notifyAdvance(employeeName, amount, accountName, accountId, note) {
   if (!(await isEventEnabled('advance_given'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
+  const accLabel = accountName || accInfo?.name || '—';
   await sendTelegramMessage(
-    `💳 <b>Advance Given</b>\nEmployee: ${employeeName}\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accountName || '—'}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `💳 <b>Advance Given</b>\nEmployee: ${employeeName}\nAmount: <b>${fmt(amount)}</b>\nAccount: ${accLabel}${note ? `\nReason: ${note}` : ''}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 
-async function notifyCourierPayment(source, netReceived, charge, accountName, accountId) {
+async function notifyCourierPayment(source, netReceived, charge, accountName, accountId, ref, orderNos) {
   if (!(await isEventEnabled('courier_payment'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
   const src = source === 'leopard' ? '🚚 Leopard' : '📬 LAAM';
   await sendTelegramMessage(
-    `${src} <b>Payment Received</b>\nNet Amount: <b>${fmt(netReceived)}</b>${charge ? `\nCharges Deducted: ${fmt(charge)}` : ''}\nAccount: ${accountName || '—'}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `${src} <b>Payment Received</b>\nNet Amount: <b>${fmt(netReceived)}</b>${charge ? `\nCharges Deducted: ${fmt(charge)}` : ''}${ref ? `\nRef: ${ref}` : ''}${orderNos ? `\nOrders: ${orderNos}` : ''}\nAccount: ${accountName || '—'}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 
-async function notifyVendorPayment(vendorName, amount, type, jobCollection, accountName, accountId) {
+async function notifyVendorPayment(vendorName, amount, type, jobCollection, accountName, accountId, notes) {
   if (!(await isEventEnabled('vendor_payment'))) return;
   const accInfo = accountId ? await getAccountBalance(accountId) : null;
   const label = type === 'advance' ? '💳 Vendor Advance' : '🏭 Vendor Payment';
   await sendTelegramMessage(
-    `${label}\nVendor: <b>${vendorName}</b>\nAmount: <b>${fmt(amount)}</b>${jobCollection ? `\nJob: ${jobCollection}` : ''}\nAccount: ${accountName}${balanceLine(accInfo)}\n🕐 ${now()}`
+    `${label}\nVendor: <b>${vendorName}</b>\nAmount: <b>${fmt(amount)}</b>${jobCollection ? `\nJob: ${jobCollection}` : ''}${notes ? `\nNote: ${notes}` : ''}\nAccount: ${accountName}${balanceLine(accInfo)}\n🕐 ${now()}`
   );
 }
 

@@ -229,7 +229,7 @@ const createSupplierPayment = async (req, res) => {
         account: { select: { id: true, name: true } },
       },
     });
-    notifySupplierPayment(payment.supplier?.name || '', payment.amount, payment.account?.name || '', payment.account?.id).catch(() => {});
+    notifySupplierPayment(payment.supplier?.name || '', payment.amount, payment.account?.name || '', payment.account?.id, payment.note).catch(() => {});
     return res.status(201).json({ message: 'Payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create payment', details: err.message });
