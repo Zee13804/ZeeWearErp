@@ -18,7 +18,14 @@ const KEY_MAP = {
   notifyCourierPayment:  'notif_courier_payment',
   notifyVendorPayment:   'notif_vendor_payment',
   notifyDailyReport:     'notif_daily_report',
+  companyName:           'company_name',
+  companyAddress:        'company_address',
+  companyPhone:          'company_phone',
+  companyEmail:          'company_email',
+  companyTagline:        'company_tagline',
 };
+
+const BOOL_KEYS = ['notifyInvoiceCreated','notifyInvoicePayment','notifyTransfer','notifyExpense','notifySupplierPayment','notifySalaryPaid','notifyAdvance','notifyCourierPayment','notifyVendorPayment','notifyDailyReport'];
 
 const DB_KEYS = Object.values(KEY_MAP);
 
@@ -40,7 +47,7 @@ const getSettings = async (req, res) => {
       if (camel === 'telegramBotToken' && val) {
         val = val.replace(/^(.{6}).*(.{4})$/, '$1****$2');
       }
-      if (['notifyInvoiceCreated','notifyInvoicePayment','notifyTransfer','notifyExpense','notifySupplierPayment','notifySalaryPaid','notifyAdvance','notifyCourierPayment','notifyVendorPayment','notifyDailyReport'].includes(camel)) {
+      if (BOOL_KEYS.includes(camel)) {
         result[camel] = val !== 'false';
       } else {
         result[camel] = val;

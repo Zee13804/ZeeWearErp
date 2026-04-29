@@ -44,9 +44,18 @@ export default function AccountingReportsPage() {
   const [productionJobsFilter, setProductionJobsFilter] = useState({ from: "", to: "", status: "all" });
   const [salaryDueFilter, setSalaryDueFilter] = useState({ month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()) });
 
+  const [company, setCompany] = useState<{ name?: string; address?: string; phone?: string; email?: string; tagline?: string }>({});
+
   useEffect(() => {
     apiGet("/accounting/accounts").then(r => setAccounts(r.accounts || [])).catch(() => {});
     apiGet("/accounting/suppliers").then(r => setSupplierList(r.suppliers || [])).catch(() => {});
+    apiGet("/settings").then(s => setCompany({
+      name: s.companyName || "Zee Wear",
+      address: s.companyAddress || "",
+      phone: s.companyPhone || "",
+      email: s.companyEmail || "",
+      tagline: s.companyTagline || "",
+    })).catch(() => setCompany({ name: "Zee Wear" }));
   }, []);
 
   const load = async () => {
@@ -326,6 +335,24 @@ export default function AccountingReportsPage() {
             <Button size="sm" onClick={load} className="cursor-pointer">Apply</Button>
           </div>
 
+        <div className="printable-area">
+          <div className="hidden print:block mb-4 pb-3 border-b border-gray-300">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-bold">{company.name || "Zee Wear"}</h2>
+                {company.tagline && <p className="text-xs text-gray-600">{company.tagline}</p>}
+                {company.address && <p className="text-xs">{company.address}</p>}
+                {(company.phone || company.email) && (
+                  <p className="text-xs">{[company.phone, company.email].filter(Boolean).join(" · ")}</p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold">{tabs.find(t => t.key === tab)?.label || "Report"}</p>
+                <p className="text-xs text-gray-600">Printed: {new Date().toLocaleString("en-PK")}</p>
+              </div>
+            </div>
+          </div>
+
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
         ) : !data ? null : tab === "pl" ? (
@@ -369,6 +396,7 @@ export default function AccountingReportsPage() {
         ) : tab === "salary-due" ? (
           <SalaryDueReport data={data as unknown as SalaryDueData} onExport={exportCSV} />
         ) : null}
+        </div>
       </div>
     </DashboardLayout>
   );

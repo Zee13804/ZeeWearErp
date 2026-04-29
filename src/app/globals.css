@@ -83,4 +83,12 @@ body {
   .space-y-5 > * + * { margin-top: 8px !important; }
   .space-y-4 > * + * { margin-top: 6px !important; }
   @page { margin: 1.5cm 1cm; size: A4; }
+
+  /* When a printable container exists, hide everything except it.
+     Used by reports, supplier ledger, invoices to print only the report itself. */
+  body:has(.printable-area) > *:not(.printable-area):not(:has(.printable-area)) { display: none !important; }
+  body:has(.printable-area) .printable-area { display: block !important; position: absolute !important; inset: 0 !important; padding: 0 !important; margin: 0 !important; background: white !important; z-index: 9999 !important; }
+  body:has(.printable-area) .printable-area * { visibility: visible !important; }
+  /* Inside a printable-area, force-hide anything explicitly marked print:hidden */
+  .printable-area .print\:hidden, .printable-area [class*="print:hidden"] { display: none !important; }
 }

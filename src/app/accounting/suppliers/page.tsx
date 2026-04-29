@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { isAdmin } from "@/lib/auth";
-import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, Upload, X, ChevronDown, ChevronUp, BookOpen, Search, Edit2, Printer } from "lucide-react";
 
 interface Supplier {
   id: number;
@@ -18,11 +18,13 @@ interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
+  note?: string;
   totalPurchased: number;
   totalPaid: number;
   balance: number;
 }
 
+interface PurchaseItem { description: string; quantity: number; unit: string; unitPrice: number; totalPrice: number }
 interface Purchase {
   id: number;
   supplierId: number;
@@ -33,24 +35,32 @@ interface Purchase {
   billImage?: string;
   collection?: string;
   purchaseDate: string;
-  items: Array<{ description: string; quantity: number; unit: string; unitPrice: number; totalPrice: number }>;
+  items: PurchaseItem[];
 }
 
 interface SupplierPayment {
   id: number;
   supplierId: number;
   supplier: { name: string };
-  account: { name: string };
+  account: { id: number; name: string };
   amount: number;
   note?: string;
   paymentDate: string;
 }
 
 interface Account { id: number; name: string; }
+interface CompanyInfo { name?: string; address?: string; phone?: string; email?: string; tagline?: string }
 
 function fmt(n: number) { return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 
 type Tab = "suppliers" | "purchases" | "payments";
+
+const emptySupplierForm = { name: "", company: "", phone: "", email: "", address: "", note: "" };
+const emptyPurchaseForm = {
+  supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", collection: "",
+  items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }],
+};
+const emptyPaymentForm = { supplierId: "", accountId: "", amount: "", note: "", paymentDate: "" };
 
 export default function SuppliersPage() {
   const canDelete = isAdmin();
@@ -60,8 +70,13 @@ export default function SuppliersPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [company, setCompany] = useState<CompanyInfo>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [searchSupplier, setSearchSupplier] = useState("");
+  const [searchPurchase, setSearchPurchase] = useState("");
+  const [searchPayment, setSearchPayment] = useState("");
 
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
@@ -74,46 +89,82 @@ export default function SuppliersPage() {
   const [supplierLedger, setSupplierLedger] = useState<{ supplier: { id: number; name: string; phone?: string }; ledger: Array<{ date: string; type: string; description: string; amount: number; runningBalance: number }>; totalPurchased: number; totalPaid: number; balance: number } | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
-  const [supplierForm, setSupplierForm] = useState({ name: "", company: "", phone: "", email: "", address: "" });
-  const [purchaseForm, setPurchaseForm] = useState({
-    supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", collection: "",
-    items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }],
-  });
-  const [paymentForm, setPaymentForm] = useState({ supplierId: "", accountId: "", amount: "", note: "", paymentDate: "" });
+  const [supplierForm, setSupplierForm] = useState(emptySupplierForm);
+  const [editingSupplierId, setEditingSupplierId] = useState<number | null>(null);
+
+  const [purchaseForm, setPurchaseForm] = useState(emptyPurchaseForm);
+  const [editingPurchaseId, setEditingPurchaseId] = useState<number | null>(null);
+
+  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [selectedBills, setSelectedBills] = useState<number[]>([]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [sRes, pRes, pyRes, accRes] = await Promise.all([
+      const [sRes, pRes, pyRes, accRes, settingsRes] = await Promise.all([
         apiGet("/accounting/suppliers"),
         apiGet("/accounting/suppliers/purchases"),
         apiGet("/accounting/suppliers/payments"),
         apiGet("/accounting/accounts"),
+        apiGet("/settings").catch(() => ({})),
       ]);
       setSuppliers(sRes.suppliers || []);
       setPurchases(pRes.purchases || []);
       setPayments(pyRes.payments || []);
       setAccounts(accRes.accounts || []);
+      setCompany({
+        name: settingsRes.companyName || "Zee Wear",
+        address: settingsRes.companyAddress || "",
+        phone: settingsRes.companyPhone || "",
+        email: settingsRes.companyEmail || "",
+        tagline: settingsRes.companyTagline || "",
+      });
     } catch { showToast("Failed to load data", "error"); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
+  // ── Supplier CRUD ─────────────────────────────────────────
+  const openCreateSupplier = () => {
+    setSupplierForm(emptySupplierForm);
+    setEditingSupplierId(null);
+    setShowSupplierForm(true);
+  };
+  const openEditSupplier = (s: Supplier) => {
+    setSupplierForm({
+      name: s.name || "",
+      company: s.company || "",
+      phone: s.phone || "",
+      email: s.email || "",
+      address: s.address || "",
+      note: s.note || "",
+    });
+    setEditingSupplierId(s.id);
+    setShowSupplierForm(true);
+  };
   const handleSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplierForm.name) { showToast("Supplier name required", "error"); return; }
     setSaving(true);
     try {
-      await apiPost("/accounting/suppliers", supplierForm);
-      showToast("Supplier created", "success");
+      if (editingSupplierId) {
+        await apiPut(`/accounting/suppliers/${editingSupplierId}`, supplierForm);
+        showToast("Supplier updated", "success");
+      } else {
+        await apiPost("/accounting/suppliers", supplierForm);
+        showToast("Supplier created", "success");
+      }
       setShowSupplierForm(false);
-      setSupplierForm({ name: "", company: "", phone: "", email: "", address: "" });
+      setEditingSupplierId(null);
+      setSupplierForm(emptySupplierForm);
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
   };
 
+  // ── Purchase CRUD ─────────────────────────────────────────
   const updatePurchaseItem = (idx: number, field: string, val: string) => {
     const items = [...purchaseForm.items];
     items[idx] = { ...items[idx], [field]: val };
@@ -126,21 +177,100 @@ export default function SuppliersPage() {
     setPurchaseForm({ ...purchaseForm, items, totalAmount: String(Math.round(total * 100) / 100) });
   };
 
+  const openCreatePurchase = () => {
+    setPurchaseForm(emptyPurchaseForm);
+    setEditingPurchaseId(null);
+    setShowPurchaseForm(true);
+  };
+  const openEditPurchase = (p: Purchase) => {
+    setPurchaseForm({
+      supplierId: String(p.supplierId),
+      invoiceNo: p.invoiceNo || "",
+      description: p.description || "",
+      totalAmount: String(p.totalAmount),
+      purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString().slice(0, 10) : "",
+      collection: p.collection || "",
+      items: p.items && p.items.length
+        ? p.items.map(i => ({
+            description: i.description || "",
+            quantity: String(i.quantity ?? 1),
+            unit: i.unit || "pcs",
+            unitPrice: String(i.unitPrice ?? ""),
+            totalPrice: String(i.totalPrice ?? ""),
+          }))
+        : [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }],
+    });
+    setEditingPurchaseId(p.id);
+    setShowPurchaseForm(true);
+  };
+
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!purchaseForm.supplierId || !purchaseForm.totalAmount) { showToast("Supplier and total amount required", "error"); return; }
     setSaving(true);
     try {
-      await apiPost("/accounting/suppliers/purchases", {
-        ...purchaseForm,
-        items: purchaseForm.items.filter(i => i.description),
-      });
-      showToast("Purchase recorded", "success");
+      const payload = { ...purchaseForm, items: purchaseForm.items.filter(i => i.description) };
+      if (editingPurchaseId) {
+        await apiPut(`/accounting/suppliers/purchases/${editingPurchaseId}`, payload);
+        showToast("Purchase updated", "success");
+      } else {
+        await apiPost("/accounting/suppliers/purchases", payload);
+        showToast("Purchase recorded", "success");
+      }
       setShowPurchaseForm(false);
-      setPurchaseForm({ supplierId: "", invoiceNo: "", description: "", totalAmount: "", purchaseDate: "", collection: "", items: [{ description: "", quantity: "1", unit: "pcs", unitPrice: "", totalPrice: "" }] });
+      setEditingPurchaseId(null);
+      setPurchaseForm(emptyPurchaseForm);
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
+  };
+
+  // ── Payment CRUD ──────────────────────────────────────────
+  const openCreatePayment = () => {
+    setPaymentForm(emptyPaymentForm);
+    setEditingPaymentId(null);
+    setSelectedBills([]);
+    setShowPaymentForm(true);
+  };
+  const openEditPayment = (p: SupplierPayment) => {
+    setPaymentForm({
+      supplierId: String(p.supplierId),
+      accountId: String(p.account?.id || ""),
+      amount: String(p.amount),
+      note: p.note || "",
+      paymentDate: p.paymentDate ? new Date(p.paymentDate).toISOString().slice(0, 10) : "",
+    });
+    setEditingPaymentId(p.id);
+    setSelectedBills([]);
+    setShowPaymentForm(true);
+  };
+
+  // Bills shown in payment form (for the chosen supplier)
+  const supplierBills = useMemo(() => {
+    if (!paymentForm.supplierId) return [];
+    return purchases.filter(p => p.supplierId === parseInt(paymentForm.supplierId));
+  }, [paymentForm.supplierId, purchases]);
+
+  const toggleBill = (purchaseId: number, amt: number, invNo?: string) => {
+    let next: number[];
+    if (selectedBills.includes(purchaseId)) next = selectedBills.filter(x => x !== purchaseId);
+    else next = [...selectedBills, purchaseId];
+    setSelectedBills(next);
+
+    const total = next.reduce((s, id) => {
+      const b = supplierBills.find(p => p.id === id);
+      return s + (b?.totalAmount || 0);
+    }, 0);
+    const refs = next.map(id => {
+      const b = supplierBills.find(p => p.id === id);
+      return b?.invoiceNo || `#${b?.id}`;
+    }).filter(Boolean);
+    setPaymentForm(prev => ({
+      ...prev,
+      amount: total > 0 ? String(Math.round(total * 100) / 100) : prev.amount,
+      note: refs.length > 0 ? `For: ${refs.join(", ")}` : prev.note,
+    }));
+    void amt; void invNo;
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
@@ -148,10 +278,17 @@ export default function SuppliersPage() {
     if (!paymentForm.supplierId || !paymentForm.accountId || !paymentForm.amount) { showToast("All payment fields required", "error"); return; }
     setSaving(true);
     try {
-      await apiPost("/accounting/suppliers/payments", paymentForm);
-      showToast("Payment recorded", "success");
+      if (editingPaymentId) {
+        await apiPut(`/accounting/suppliers/payments/${editingPaymentId}`, paymentForm);
+        showToast("Payment updated", "success");
+      } else {
+        await apiPost("/accounting/suppliers/payments", paymentForm);
+        showToast("Payment recorded", "success");
+      }
       setShowPaymentForm(false);
-      setPaymentForm({ supplierId: "", accountId: "", amount: "", note: "", paymentDate: "" });
+      setEditingPaymentId(null);
+      setPaymentForm(emptyPaymentForm);
+      setSelectedBills([]);
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -201,21 +338,53 @@ export default function SuppliersPage() {
     finally { setLedgerLoading(false); }
   };
 
-  const totalDebt = suppliers.reduce((s, sup) => s + sup.balance, 0);
+  // ── Filtered lists ────────────────────────────────────────
+  const filteredSuppliers = useMemo(() => {
+    if (!searchSupplier.trim()) return suppliers;
+    const q = searchSupplier.toLowerCase();
+    return suppliers.filter(s =>
+      s.name.toLowerCase().includes(q) ||
+      (s.company || "").toLowerCase().includes(q) ||
+      (s.phone || "").toLowerCase().includes(q)
+    );
+  }, [suppliers, searchSupplier]);
+
+  const filteredPurchases = useMemo(() => {
+    if (!searchPurchase.trim()) return purchases;
+    const q = searchPurchase.toLowerCase();
+    return purchases.filter(p =>
+      (p.invoiceNo || "").toLowerCase().includes(q) ||
+      p.supplier.name.toLowerCase().includes(q) ||
+      (p.description || "").toLowerCase().includes(q) ||
+      (p.collection || "").toLowerCase().includes(q)
+    );
+  }, [purchases, searchPurchase]);
+
+  const filteredPayments = useMemo(() => {
+    if (!searchPayment.trim()) return payments;
+    const q = searchPayment.toLowerCase();
+    return payments.filter(p =>
+      p.supplier.name.toLowerCase().includes(q) ||
+      (p.note || "").toLowerCase().includes(q) ||
+      (p.account?.name || "").toLowerCase().includes(q)
+    );
+  }, [payments, searchPayment]);
+
+  const totalDebt = filteredSuppliers.reduce((s, sup) => s + sup.balance, 0);
 
   return (
     <DashboardLayout>
       <input ref={billInputRef} type="file" accept="image/*" className="hidden" onChange={uploadBill} />
-      <div className="space-y-5">
+      <div className="space-y-5 print:hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-foreground">Suppliers</h1>
             <p className="text-sm text-muted-foreground">Manage supplier purchases and payments</p>
           </div>
           <div className="flex gap-2">
-            {tab === "suppliers" && canManageSuppliers && <Button size="sm" onClick={() => setShowSupplierForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Supplier</Button>}
-            {tab === "purchases" && <Button size="sm" onClick={() => setShowPurchaseForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Purchase</Button>}
-            {tab === "payments" && <Button size="sm" onClick={() => setShowPaymentForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Record Payment</Button>}
+            {tab === "suppliers" && canManageSuppliers && <Button size="sm" onClick={openCreateSupplier} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Supplier</Button>}
+            {tab === "purchases" && <Button size="sm" onClick={openCreatePurchase} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Purchase</Button>}
+            {tab === "payments" && <Button size="sm" onClick={openCreatePayment} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Record Payment</Button>}
           </div>
         </div>
 
@@ -227,6 +396,14 @@ export default function SuppliersPage() {
           ))}
         </div>
 
+        {/* Search bar per tab */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          {tab === "suppliers" && <Input placeholder="Search by name, phone or company…" value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="pl-9" />}
+          {tab === "purchases" && <Input placeholder="Search by invoice no, supplier, description or collection…" value={searchPurchase} onChange={e => setSearchPurchase(e.target.value)} className="pl-9" />}
+          {tab === "payments" && <Input placeholder="Search by supplier, account or note…" value={searchPayment} onChange={e => setSearchPayment(e.target.value)} className="pl-9" />}
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
         ) : tab === "suppliers" ? (
@@ -235,7 +412,7 @@ export default function SuppliersPage() {
               <span className="text-sm font-medium text-muted-foreground">Total Supplier Debt</span>
               <span className={`text-xl font-bold ${totalDebt > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(totalDebt)}</span>
             </div>
-            {suppliers.length === 0 ? <div className="text-center py-12 text-muted-foreground">No suppliers yet.</div> : (
+            {filteredSuppliers.length === 0 ? <div className="text-center py-12 text-muted-foreground">{suppliers.length === 0 ? "No suppliers yet." : "No matching suppliers."}</div> : (
               <div className="bg-background rounded-xl border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 border-b border-border">
@@ -248,7 +425,7 @@ export default function SuppliersPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {suppliers.map(s => (
+                    {filteredSuppliers.map(s => (
                       <tr key={s.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <p className="font-medium">{s.name}</p>
@@ -261,6 +438,7 @@ export default function SuppliersPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => viewLedger(s.id)} className="p-1.5 rounded-md hover:bg-blue-50 cursor-pointer" title="View Ledger"><BookOpen className="w-3.5 h-3.5 text-blue-500" /></button>
+                            {canManageSuppliers && <button onClick={() => openEditSupplier(s)} className="p-1.5 rounded-md hover:bg-amber-50 cursor-pointer" title="Edit Supplier"><Edit2 className="w-3.5 h-3.5 text-amber-600" /></button>}
                             {canDelete && <button onClick={() => setDeleteTarget({ id: s.id, type: "supplier", name: s.name })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                           </div>
                         </td>
@@ -272,9 +450,9 @@ export default function SuppliersPage() {
             )}
           </>
         ) : tab === "purchases" ? (
-          purchases.length === 0 ? <div className="text-center py-12 text-muted-foreground">No purchases recorded yet.</div> : (
+          filteredPurchases.length === 0 ? <div className="text-center py-12 text-muted-foreground">{purchases.length === 0 ? "No purchases recorded yet." : "No matching purchases."}</div> : (
             <div className="space-y-2">
-              {purchases.map(p => (
+              {filteredPurchases.map(p => (
                 <div key={p.id} className="bg-background rounded-xl border border-border overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -297,6 +475,7 @@ export default function SuppliersPage() {
                         {uploadingBill === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
                       </button>
                       {p.billImage && <a href={`/api${p.billImage}`} target="_blank" rel="noreferrer" className="p-1.5 rounded-md hover:bg-green-50"><Eye className="w-3.5 h-3.5 text-green-600" /></a>}
+                      {canManageSuppliers && <button onClick={() => openEditPurchase(p)} className="p-1.5 rounded-md hover:bg-amber-50 cursor-pointer" title="Edit Purchase"><Edit2 className="w-3.5 h-3.5 text-amber-600" /></button>}
                       {canDelete && <button onClick={() => setDeleteTarget({ id: p.id, type: "purchase", name: `Purchase from ${p.supplier.name}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                     </div>
                   </div>
@@ -318,7 +497,7 @@ export default function SuppliersPage() {
             </div>
           )
         ) : (
-          payments.length === 0 ? <div className="text-center py-12 text-muted-foreground">No payments recorded yet.</div> : (
+          filteredPayments.length === 0 ? <div className="text-center py-12 text-muted-foreground">{payments.length === 0 ? "No payments recorded yet." : "No matching payments."}</div> : (
             <div className="bg-background rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b border-border">
@@ -332,7 +511,7 @@ export default function SuppliersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {payments.map(p => (
+                  {filteredPayments.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3 text-muted-foreground">{new Date(p.paymentDate).toLocaleDateString()}</td>
                       <td className="px-4 py-3 font-medium">{p.supplier.name}</td>
@@ -340,7 +519,10 @@ export default function SuppliersPage() {
                       <td className="px-4 py-3 text-right font-semibold text-emerald-600">Rs {fmt(p.amount)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{p.note || "—"}</td>
                       <td className="px-4 py-3 text-right">
-                        {canDelete && <button onClick={() => setDeleteTarget({ id: p.id, type: "payment", name: `Payment of Rs ${fmt(p.amount)}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                        <div className="flex items-center justify-end gap-1">
+                          {canManageSuppliers && <button onClick={() => openEditPayment(p)} className="p-1.5 rounded-md hover:bg-amber-50 cursor-pointer" title="Edit Payment"><Edit2 className="w-3.5 h-3.5 text-amber-600" /></button>}
+                          {canDelete && <button onClick={() => setDeleteTarget({ id: p.id, type: "payment", name: `Payment of Rs ${fmt(p.amount)}` })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -351,7 +533,7 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      <Dialog open={showSupplierForm} onClose={() => setShowSupplierForm(false)} title="Add Supplier" description="Create a new supplier">
+      <Dialog open={showSupplierForm} onClose={() => { setShowSupplierForm(false); setEditingSupplierId(null); }} title={editingSupplierId ? "Edit Supplier" : "Add Supplier"} description={editingSupplierId ? "Update supplier details" : "Create a new supplier"}>
         <form onSubmit={handleSupplierSubmit} className="space-y-3">
           <FormField label="Name" required><Input value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} placeholder="Supplier name" /></FormField>
           <FormField label="Company"><Input value={supplierForm.company} onChange={e => setSupplierForm({ ...supplierForm, company: e.target.value })} placeholder="Company name" /></FormField>
@@ -360,14 +542,15 @@ export default function SuppliersPage() {
             <FormField label="Email"><Input value={supplierForm.email} onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })} placeholder="Email" /></FormField>
           </div>
           <FormField label="Address"><Input value={supplierForm.address} onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })} placeholder="Address" /></FormField>
+          <FormField label="Note"><Input value={supplierForm.note} onChange={e => setSupplierForm({ ...supplierForm, note: e.target.value })} placeholder="Optional note" /></FormField>
           <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowSupplierForm(false)} className="cursor-pointer">Cancel</Button>
-            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Create"}</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowSupplierForm(false); setEditingSupplierId(null); }} className="cursor-pointer">Cancel</Button>
+            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : editingSupplierId ? "Update" : "Create"}</Button>
           </div>
         </form>
       </Dialog>
 
-      <Dialog open={showPurchaseForm} onClose={() => setShowPurchaseForm(false)} title="Record Purchase" description="Add a supplier credit purchase">
+      <Dialog open={showPurchaseForm} onClose={() => { setShowPurchaseForm(false); setEditingPurchaseId(null); }} title={editingPurchaseId ? "Edit Purchase" : "Record Purchase"} description={editingPurchaseId ? "Update an existing purchase" : "Add a supplier credit purchase"}>
         <form onSubmit={handlePurchaseSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Supplier" required>
@@ -410,17 +593,43 @@ export default function SuppliersPage() {
             <Input type="number" value={purchaseForm.totalAmount} onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })} placeholder="0.00" min="0" step="0.01" />
           </FormField>
           <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowPurchaseForm(false)} className="cursor-pointer">Cancel</Button>
-            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Record"}</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowPurchaseForm(false); setEditingPurchaseId(null); }} className="cursor-pointer">Cancel</Button>
+            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : editingPurchaseId ? "Update" : "Record"}</Button>
           </div>
         </form>
       </Dialog>
 
-      <Dialog open={showPaymentForm} onClose={() => setShowPaymentForm(false)} title="Record Supplier Payment" description="Pay a supplier">
+      <Dialog open={showPaymentForm} onClose={() => { setShowPaymentForm(false); setEditingPaymentId(null); }} title={editingPaymentId ? "Edit Supplier Payment" : "Record Supplier Payment"} description={editingPaymentId ? "Update payment details" : "Pay a supplier"} className="max-w-2xl">
         <form onSubmit={handlePaymentSubmit} className="space-y-3">
           <FormField label="Supplier" required>
-            <Select value={paymentForm.supplierId} onChange={val => setPaymentForm({ ...paymentForm, supplierId: val})} options={[{ label: "Select supplier", value: "" }, ...suppliers.map(s => ({ label: `${s.name} (Rs ${fmt(s.balance)} due)`, value: String(s.id) }))]} />
+            <Select value={paymentForm.supplierId} onChange={val => { setPaymentForm({ ...paymentForm, supplierId: val }); setSelectedBills([]); }} options={[{ label: "Select supplier", value: "" }, ...suppliers.map(s => ({ label: `${s.name} (Rs ${fmt(s.balance)} due)`, value: String(s.id) }))]} />
           </FormField>
+
+          {/* Multi-bill selection panel */}
+          {!editingPaymentId && supplierBills.length > 0 && (
+            <div className="border border-border rounded-lg bg-muted/20 p-3 space-y-2 max-h-56 overflow-y-auto">
+              <p className="text-xs font-semibold text-muted-foreground">Outstanding Bills (tap to attach to this payment)</p>
+              {supplierBills.map(b => {
+                const checked = selectedBills.includes(b.id);
+                return (
+                  <label key={b.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md border cursor-pointer transition-colors ${checked ? "border-primary bg-primary/5" : "border-border bg-background hover:bg-muted/40"}`}>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" className="w-4 h-4 accent-primary" checked={checked} onChange={() => toggleBill(b.id, b.totalAmount, b.invoiceNo)} />
+                      <div>
+                        <p className="text-sm font-medium">{b.invoiceNo ? `#${b.invoiceNo}` : `Bill #${b.id}`}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(b.purchaseDate).toLocaleDateString()}{b.description ? ` · ${b.description}` : ""}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold">Rs {fmt(b.totalAmount)}</p>
+                  </label>
+                );
+              })}
+              {selectedBills.length > 0 && (
+                <p className="text-xs text-muted-foreground">{selectedBills.length} bill{selectedBills.length > 1 ? "s" : ""} selected · amount and note auto-filled (you can still edit)</p>
+              )}
+            </div>
+          )}
+
           <FormField label="Pay From Account" required>
             <Select value={paymentForm.accountId} onChange={val => setPaymentForm({ ...paymentForm, accountId: val})} options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} />
           </FormField>
@@ -428,8 +637,8 @@ export default function SuppliersPage() {
           <FormField label="Date"><Input type="date" value={paymentForm.paymentDate} onChange={e => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} /></FormField>
           <FormField label="Note"><Input value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} placeholder="Optional note" /></FormField>
           <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowPaymentForm(false)} className="cursor-pointer">Cancel</Button>
-            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Record"}</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowPaymentForm(false); setEditingPaymentId(null); }} className="cursor-pointer">Cancel</Button>
+            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : editingPaymentId ? "Update" : "Record"}</Button>
           </div>
         </form>
       </Dialog>
@@ -441,35 +650,47 @@ export default function SuppliersPage() {
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : supplierLedger ? (
           <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Purchased</p><p className="font-bold text-sm mt-1">Rs {fmt(supplierLedger.totalPurchased)}</p></div>
-              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Paid</p><p className="font-bold text-sm mt-1 text-emerald-600">Rs {fmt(supplierLedger.totalPaid)}</p></div>
-              <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Balance Due</p><p className={`font-bold text-sm mt-1 ${supplierLedger.balance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(supplierLedger.balance)}</p></div>
+            <div className="flex justify-end print:hidden">
+              <Button size="sm" variant="outline" className="gap-2 cursor-pointer" onClick={() => window.print()}><Printer className="w-4 h-4" /> Print</Button>
             </div>
-            <div className="bg-background rounded-xl border border-border overflow-hidden max-h-96 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b border-border sticky top-0">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Debit</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Credit</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Balance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {supplierLedger.ledger.map((row, i) => (
-                    <tr key={i} className="hover:bg-muted/20">
-                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{new Date(row.date).toLocaleDateString()}</td>
-                      <td className="px-3 py-2">{row.description}</td>
-                      <td className="px-3 py-2 text-right text-red-600">{row.type === "debit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
-                      <td className="px-3 py-2 text-right text-emerald-600">{row.type === "credit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
-                      <td className={`px-3 py-2 text-right font-semibold ${row.runningBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(row.runningBalance)}</td>
+            <div className="printable-area">
+              <div className="hidden print:block mb-4 pb-3 border-b">
+                <h2 className="text-xl font-bold">{company.name || "Company Name"}</h2>
+                {company.tagline && <p className="text-xs text-muted-foreground">{company.tagline}</p>}
+                {company.address && <p className="text-xs">{company.address}</p>}
+                {(company.phone || company.email) && <p className="text-xs">{[company.phone, company.email].filter(Boolean).join(" · ")}</p>}
+                <p className="mt-2 text-sm font-semibold">Supplier Ledger — {supplierLedger.supplier.name}{supplierLedger.supplier.phone ? ` · ${supplierLedger.supplier.phone}` : ""}</p>
+              </div>
+              <div className="flex gap-3">
+                <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Purchased</p><p className="font-bold text-sm mt-1">Rs {fmt(supplierLedger.totalPurchased)}</p></div>
+                <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Total Paid</p><p className="font-bold text-sm mt-1 text-emerald-600">Rs {fmt(supplierLedger.totalPaid)}</p></div>
+                <div className="bg-background border border-border rounded-lg p-3 flex-1 text-center"><p className="text-xs text-muted-foreground">Balance Due</p><p className={`font-bold text-sm mt-1 ${supplierLedger.balance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(supplierLedger.balance)}</p></div>
+              </div>
+              <div className="bg-background rounded-xl border border-border overflow-hidden max-h-96 overflow-y-auto mt-3">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b border-border sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Debit</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Credit</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Balance</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {supplierLedger.ledger.length === 0 && <p className="text-center py-8 text-muted-foreground">No transactions found</p>}
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {supplierLedger.ledger.map((row, i) => (
+                      <tr key={i} className="hover:bg-muted/20">
+                        <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{new Date(row.date).toLocaleDateString()}</td>
+                        <td className="px-3 py-2">{row.description}</td>
+                        <td className="px-3 py-2 text-right text-red-600">{row.type === "debit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                        <td className="px-3 py-2 text-right text-emerald-600">{row.type === "credit" ? `Rs ${fmt(row.amount)}` : "—"}</td>
+                        <td className={`px-3 py-2 text-right font-semibold ${row.runningBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>Rs {fmt(row.runningBalance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {supplierLedger.ledger.length === 0 && <p className="text-center py-8 text-muted-foreground">No transactions found</p>}
+              </div>
             </div>
           </div>
         ) : null}

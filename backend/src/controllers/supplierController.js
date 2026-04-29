@@ -172,6 +172,46 @@ const uploadPurchaseBill = async (req, res) => {
   }
 };
 
+const updatePurchase = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplierId, invoiceNo, description, totalAmount, items, purchaseDate, collection } = req.body;
+    const purchaseId = parseInt(id);
+
+    // If items array provided, replace all items
+    if (Array.isArray(items)) {
+      await prisma.supplierPurchaseItem.deleteMany({ where: { purchaseId } });
+    }
+
+    const purchase = await prisma.supplierPurchase.update({
+      where: { id: purchaseId },
+      data: {
+        ...(supplierId && { supplierId: parseInt(supplierId) }),
+        ...(invoiceNo !== undefined && { invoiceNo: invoiceNo || null }),
+        ...(description !== undefined && { description: description || null }),
+        ...(totalAmount !== undefined && { totalAmount: parseFloat(totalAmount) }),
+        ...(collection !== undefined && { collection: collection ? collection.trim() : null }),
+        ...(purchaseDate && { purchaseDate: new Date(purchaseDate) }),
+        ...(Array.isArray(items) && items.length ? {
+          items: {
+            create: items.filter(i => i.description).map(item => ({
+              description: item.description,
+              quantity: parseFloat(item.quantity) || 1,
+              unit: item.unit || 'pcs',
+              unitPrice: parseFloat(item.unitPrice) || 0,
+              totalPrice: parseFloat(item.totalPrice) || 0,
+            })),
+          },
+        } : {}),
+      },
+      include: { items: true },
+    });
+    return res.json({ message: 'Purchase updated', purchase });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update purchase', details: err.message });
+  }
+};
+
 const deletePurchase = async (req, res) => {
   try {
     const { id } = req.params;
@@ -233,6 +273,31 @@ const createSupplierPayment = async (req, res) => {
     return res.status(201).json({ message: 'Payment recorded', payment });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create payment', details: err.message });
+  }
+};
+
+const updateSupplierPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplierId, accountId, amount, note, paymentDate } = req.body;
+
+    const payment = await prisma.supplierPayment.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(supplierId && { supplierId: parseInt(supplierId) }),
+        ...(accountId && { accountId: parseInt(accountId) }),
+        ...(amount !== undefined && { amount: parseFloat(amount) }),
+        ...(note !== undefined && { note: note || null }),
+        ...(paymentDate && { paymentDate: new Date(paymentDate) }),
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
+      },
+    });
+    return res.json({ message: 'Payment updated', payment });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update payment', details: err.message });
   }
 };
 
@@ -301,7 +366,7 @@ const getSupplierLedger = async (req, res) => {
 
 module.exports = {
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
-  getPurchases, createPurchase, uploadPurchaseBill, deletePurchase,
-  getSupplierPayments, createSupplierPayment, deleteSupplierPayment,
+  getPurchases, createPurchase, updatePurchase, uploadPurchaseBill, deletePurchase,
+  getSupplierPayments, createSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
   getSupplierLedger,
 };

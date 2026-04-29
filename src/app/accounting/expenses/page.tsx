@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { isAdmin } from "@/lib/auth";
-import { Plus, Trash2, Loader2, Eye, Upload } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, Upload, Search, Edit2 } from "lucide-react";
 
 interface Category { id: number; name: string; type: string; _count?: { expenses: number }; }
 interface Account { id: number; name: string; }
@@ -17,8 +17,8 @@ interface Expense {
   id: number;
   description: string;
   amount: number;
-  category: { name: string };
-  account: { name: string };
+  category: { id: number; name: string };
+  account: { id: number; name: string };
   collection?: string;
   billImage?: string;
   expenseDate: string;
@@ -37,8 +37,11 @@ const catTypes = [
   { label: "Other", value: "other" },
 ];
 
+const emptyExpenseForm = { categoryId: "", accountId: "", amount: "", description: "", collection: "", expenseDate: "" };
+
 export default function ExpensesPage() {
   const canDelete = isAdmin();
+  const canManage = isAdmin();
   const [tab, setTab] = useState<Tab>("expenses");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -52,8 +55,10 @@ export default function ExpensesPage() {
   const [billTargetId, setBillTargetId] = useState<number | null>(null);
   const billInputRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState({ categoryId: "", dateFrom: "", dateTo: "" });
+  const [search, setSearch] = useState("");
 
-  const [expenseForm, setExpenseForm] = useState({ categoryId: "", accountId: "", amount: "", description: "", collection: "", expenseDate: "" });
+  const [expenseForm, setExpenseForm] = useState(emptyExpenseForm);
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: "", type: "other" });
 
   const load = async () => {
@@ -77,6 +82,24 @@ export default function ExpensesPage() {
 
   useEffect(() => { load(); }, [filter]);
 
+  const openCreateExpense = () => {
+    setExpenseForm(emptyExpenseForm);
+    setEditingExpenseId(null);
+    setShowExpenseForm(true);
+  };
+  const openEditExpense = (e: Expense) => {
+    setExpenseForm({
+      categoryId: String(e.category?.id || ""),
+      accountId: String(e.account?.id || ""),
+      amount: String(e.amount),
+      description: e.description || "",
+      collection: e.collection || "",
+      expenseDate: e.expenseDate ? new Date(e.expenseDate).toISOString().slice(0, 10) : "",
+    });
+    setEditingExpenseId(e.id);
+    setShowExpenseForm(true);
+  };
+
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseForm.categoryId || !expenseForm.accountId || !expenseForm.amount || !expenseForm.description) {
@@ -84,10 +107,16 @@ export default function ExpensesPage() {
     }
     setSaving(true);
     try {
-      await apiPost("/accounting/expenses", expenseForm);
-      showToast("Expense recorded", "success");
+      if (editingExpenseId) {
+        await apiPut(`/accounting/expenses/${editingExpenseId}`, expenseForm);
+        showToast("Expense updated", "success");
+      } else {
+        await apiPost("/accounting/expenses", expenseForm);
+        showToast("Expense recorded", "success");
+      }
       setShowExpenseForm(false);
-      setExpenseForm({ categoryId: "", accountId: "", amount: "", description: "", collection: "", expenseDate: "" });
+      setEditingExpenseId(null);
+      setExpenseForm(emptyExpenseForm);
       load();
     } catch (err: unknown) { showToast((err as Error).message || "Failed", "error"); }
     finally { setSaving(false); }
@@ -140,7 +169,18 @@ export default function ExpensesPage() {
     finally { setUploadingBill(null); setBillTargetId(null); if (billInputRef.current) billInputRef.current.value = ""; }
   };
 
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const filteredExpenses = useMemo(() => {
+    if (!search.trim()) return expenses;
+    const q = search.toLowerCase();
+    return expenses.filter(e =>
+      e.description.toLowerCase().includes(q) ||
+      e.category.name.toLowerCase().includes(q) ||
+      e.account.name.toLowerCase().includes(q) ||
+      (e.collection || "").toLowerCase().includes(q)
+    );
+  }, [expenses, search]);
+
+  const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
 
   return (
     <DashboardLayout>
@@ -153,7 +193,7 @@ export default function ExpensesPage() {
           </div>
           <div className="flex gap-2">
             {tab === "categories" && <Button size="sm" onClick={() => setShowCategoryForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Category</Button>}
-            {tab === "expenses" && <Button size="sm" onClick={() => setShowExpenseForm(true)} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Expense</Button>}
+            {tab === "expenses" && <Button size="sm" onClick={openCreateExpense} className="gap-2 cursor-pointer"><Plus className="w-4 h-4" /> Add Expense</Button>}
           </div>
         </div>
 
@@ -166,12 +206,18 @@ export default function ExpensesPage() {
         </div>
 
         {tab === "expenses" && (
-          <div className="flex flex-wrap gap-3 bg-background rounded-xl border border-border p-3">
-            <Select value={filter.categoryId} onChange={val => setFilter({ ...filter, categoryId: val})} options={[{ label: "All Categories", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} className="min-w-[150px]" />
-            <Input type="date" value={filter.dateFrom} onChange={e => setFilter({ ...filter, dateFrom: e.target.value })} className="max-w-[150px]" />
-            <Input type="date" value={filter.dateTo} onChange={e => setFilter({ ...filter, dateTo: e.target.value })} className="max-w-[150px]" />
-            <button onClick={() => setFilter({ categoryId: "", dateFrom: "", dateTo: "" })} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Clear</button>
-          </div>
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input placeholder="Search by description, category, account or collection…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+            </div>
+            <div className="flex flex-wrap gap-3 bg-background rounded-xl border border-border p-3">
+              <Select value={filter.categoryId} onChange={val => setFilter({ ...filter, categoryId: val})} options={[{ label: "All Categories", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} className="min-w-[150px]" />
+              <Input type="date" value={filter.dateFrom} onChange={e => setFilter({ ...filter, dateFrom: e.target.value })} className="max-w-[150px]" />
+              <Input type="date" value={filter.dateTo} onChange={e => setFilter({ ...filter, dateTo: e.target.value })} className="max-w-[150px]" />
+              <button onClick={() => setFilter({ categoryId: "", dateFrom: "", dateTo: "" })} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Clear</button>
+            </div>
+          </>
         )}
 
         {loading ? <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
@@ -181,7 +227,7 @@ export default function ExpensesPage() {
                 <span className="text-sm font-medium text-muted-foreground">Total Expenses Shown</span>
                 <span className="text-xl font-bold text-red-600">Rs {fmt(totalExpenses)}</span>
               </div>
-              {expenses.length === 0 ? <div className="text-center py-12 text-muted-foreground">No expenses recorded.</div> : (
+              {filteredExpenses.length === 0 ? <div className="text-center py-12 text-muted-foreground">{expenses.length === 0 ? "No expenses recorded." : "No matching expenses."}</div> : (
                 <div className="bg-background rounded-xl border border-border overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 border-b border-border">
@@ -196,7 +242,7 @@ export default function ExpensesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {expenses.map(exp => (
+                      {filteredExpenses.map(exp => (
                         <tr key={exp.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{new Date(exp.expenseDate).toLocaleDateString()}</td>
                           <td className="px-4 py-3 font-medium">{exp.description}</td>
@@ -210,6 +256,7 @@ export default function ExpensesPage() {
                                 {uploadingBill === exp.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Upload className="w-3.5 h-3.5 text-blue-600" />}
                               </button>
                               {exp.billImage && <a href={`/api${exp.billImage}`} target="_blank" rel="noreferrer" className="p-1.5 rounded-md hover:bg-green-50"><Eye className="w-3.5 h-3.5 text-green-600" /></a>}
+                              {canManage && <button onClick={() => openEditExpense(exp)} className="p-1.5 rounded-md hover:bg-amber-50 cursor-pointer" title="Edit Expense"><Edit2 className="w-3.5 h-3.5 text-amber-600" /></button>}
                               {canDelete && <button onClick={() => setDeleteTarget({ id: exp.id, type: "expense", name: exp.description })} className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                             </div>
                           </td>
@@ -250,7 +297,7 @@ export default function ExpensesPage() {
           )}
       </div>
 
-      <Dialog open={showExpenseForm} onClose={() => setShowExpenseForm(false)} title="Add Expense" description="Record a business expense">
+      <Dialog open={showExpenseForm} onClose={() => { setShowExpenseForm(false); setEditingExpenseId(null); }} title={editingExpenseId ? "Edit Expense" : "Add Expense"} description={editingExpenseId ? "Update an existing expense" : "Record a business expense"}>
         <form onSubmit={handleExpenseSubmit} className="space-y-3">
           <FormField label="Category" required>
             <Select value={expenseForm.categoryId} onChange={val => setExpenseForm({ ...expenseForm, categoryId: val})} options={[{ label: "Select category", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} />
@@ -265,8 +312,8 @@ export default function ExpensesPage() {
             <FormField label="Date"><Input type="date" value={expenseForm.expenseDate} onChange={e => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} /></FormField>
           </div>
           <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowExpenseForm(false)} className="cursor-pointer">Cancel</Button>
-            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : "Record"}</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowExpenseForm(false); setEditingExpenseId(null); }} className="cursor-pointer">Cancel</Button>
+            <Button type="submit" disabled={saving} className="cursor-pointer">{saving ? "Saving..." : editingExpenseId ? "Update" : "Record"}</Button>
           </div>
         </form>
       </Dialog>

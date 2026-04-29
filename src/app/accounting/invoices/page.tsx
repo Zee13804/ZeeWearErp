@@ -63,6 +63,7 @@ export default function InvoicesPage() {
   const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [company, setCompany] = useState<{ name?: string; address?: string; phone?: string; email?: string; tagline?: string }>({ name: "Zee Wear" });
 
   const [customerForm, setCustomerForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [invoiceForm, setInvoiceForm] = useState({
@@ -74,18 +75,26 @@ export default function InvoicesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [invRes, custRes, accRes, varRes, empRes] = await Promise.all([
+      const [invRes, custRes, accRes, varRes, empRes, settingsRes] = await Promise.all([
         apiGet("/accounting/invoices"),
         apiGet("/accounting/invoices/customers"),
         apiGet("/accounting/accounts"),
         apiGet("/variants"),
         apiGet("/accounting/employees"),
+        apiGet("/settings").catch(() => ({})),
       ]);
       setInvoices(invRes.invoices || []);
       setCustomers(custRes.customers || []);
       setAccounts(accRes.accounts || []);
       setVariants(varRes.variants || []);
       setEmployees(empRes.employees || []);
+      setCompany({
+        name: settingsRes.companyName || "Zee Wear",
+        address: settingsRes.companyAddress || "",
+        phone: settingsRes.companyPhone || "",
+        email: settingsRes.companyEmail || "",
+        tagline: settingsRes.companyTagline || "",
+      });
     } catch { showToast("Failed to load data", "error"); }
     finally { setLoading(false); }
   };
@@ -422,12 +431,17 @@ export default function InvoicesPage() {
             <div className="flex justify-end mb-4 print:hidden">
               <Button size="sm" onClick={() => window.print()} className="gap-2 cursor-pointer"><Printer className="w-4 h-4" /> Print</Button>
             </div>
-            <div className="border border-border rounded-xl overflow-hidden">
+            <div className="printable-area border border-border rounded-xl overflow-hidden">
               <div className="bg-primary/5 px-6 py-4 border-b border-border">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-foreground">Zee Wear</h2>
-                    <p className="text-sm text-muted-foreground">INVOICE</p>
+                    <h2 className="text-xl font-bold text-foreground">{company.name || "Zee Wear"}</h2>
+                    {company.tagline && <p className="text-xs text-muted-foreground">{company.tagline}</p>}
+                    {company.address && <p className="text-xs text-muted-foreground mt-0.5">{company.address}</p>}
+                    {(company.phone || company.email) && (
+                      <p className="text-xs text-muted-foreground">{[company.phone, company.email].filter(Boolean).join(" · ")}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-1">INVOICE</p>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-primary">{printInvoice.invoiceNo}</p>
@@ -485,7 +499,7 @@ export default function InvoicesPage() {
                 </div>
               )}
               <div className="px-6 py-3 border-t border-border text-center text-xs text-muted-foreground">
-                Thank you for your business · Zee Wear
+                Thank you for your business · {company.name || "Zee Wear"}
               </div>
             </div>
           </div>

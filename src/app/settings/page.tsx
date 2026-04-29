@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { showToast } from "@/components/ui/toast";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
-import { Plus, Trash2, Tag, Lock, Download, Upload, Database, Loader2, Image, FileText, CheckCircle2, AlertCircle, Bell, Send } from "lucide-react";
+import { Plus, Trash2, Tag, Lock, Download, Upload, Database, Loader2, Image, FileText, CheckCircle2, AlertCircle, Bell, Send, Building2 } from "lucide-react";
 import { isAdmin } from "@/lib/auth";
 import { usePermissions } from "@/lib/permissions";
 
@@ -67,6 +67,15 @@ export default function SettingsPage() {
   const [savingNotif, setSavingNotif] = useState(false);
   const [testingNotif, setTestingNotif] = useState(false);
   const [sendingReport, setSendingReport] = useState(false);
+
+  const [companyProfile, setCompanyProfile] = useState({
+    companyName: "",
+    companyTagline: "",
+    companyAddress: "",
+    companyPhone: "",
+    companyEmail: "",
+  });
+  const [savingCompany, setSavingCompany] = useState(false);
 
   const handleDownloadBackup = async () => {
     setDownloadingBackup(true);
@@ -241,6 +250,34 @@ export default function SettingsPage() {
     if (isAdmin()) fetchNotifSettings();
   }, []);
 
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const data = await apiGet("/settings");
+        setCompanyProfile({
+          companyName: data.companyName || "",
+          companyTagline: data.companyTagline || "",
+          companyAddress: data.companyAddress || "",
+          companyPhone: data.companyPhone || "",
+          companyEmail: data.companyEmail || "",
+        });
+      } catch {}
+    };
+    if (isAdmin()) fetchCompany();
+  }, []);
+
+  const handleSaveCompany = async () => {
+    setSavingCompany(true);
+    try {
+      await apiPost("/settings", companyProfile);
+      showToast("Company profile saved", "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to save company profile", "error");
+    } finally {
+      setSavingCompany(false);
+    }
+  };
+
   const handleSaveNotifSettings = async () => {
     setSavingNotif(true);
     try {
@@ -300,6 +337,70 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your system settings</p>
         </div>
+
+        {isAdmin() && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" />
+                <CardTitle>Company Profile</CardTitle>
+              </div>
+              <CardDescription>
+                Shown on printed invoices, supplier ledgers and reports
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Company Name</label>
+                  <Input
+                    placeholder="e.g. Zee Wear"
+                    value={companyProfile.companyName}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, companyName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Tagline (optional)</label>
+                  <Input
+                    placeholder="e.g. Premium Garments Manufacturer"
+                    value={companyProfile.companyTagline}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, companyTagline: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-medium">Address</label>
+                  <Input
+                    placeholder="Full business address"
+                    value={companyProfile.companyAddress}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, companyAddress: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Phone</label>
+                  <Input
+                    placeholder="e.g. +92 300 0000000"
+                    value={companyProfile.companyPhone}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, companyPhone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    placeholder="e.g. info@zeewear.com"
+                    value={companyProfile.companyEmail}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, companyEmail: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveCompany} disabled={savingCompany} className="gap-2 cursor-pointer">
+                  {savingCompany ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Save Company Profile
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

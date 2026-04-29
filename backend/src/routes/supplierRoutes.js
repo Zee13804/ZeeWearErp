@@ -4,8 +4,8 @@ const multer = require('multer');
 const { authenticate, authorize, authorizeAccounting } = require('../middleware/authMiddleware');
 const {
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
-  getPurchases, createPurchase, uploadPurchaseBill, deletePurchase,
-  getSupplierPayments, createSupplierPayment, deleteSupplierPayment,
+  getPurchases, createPurchase, updatePurchase, uploadPurchaseBill, deletePurchase,
+  getSupplierPayments, createSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
   getSupplierLedger,
 } = require('../controllers/supplierController');
 
@@ -21,11 +21,13 @@ router.get('/:id/ledger', ...accAuth, getSupplierLedger);
 
 router.get('/purchases', ...accAuth, getPurchases);
 router.post('/purchases', ...accAuth, createPurchase);
+router.put('/purchases/:id', ...adminAuth, updatePurchase);
 router.post('/purchases/:id/bill', ...accAuth, upload.single('bill'), uploadPurchaseBill);
 router.delete('/purchases/:id', ...adminAuth, deletePurchase);
 
 router.get('/payments', ...accAuth, getSupplierPayments);
 router.post('/payments', ...accAuth, createSupplierPayment);
+router.put('/payments/:id', ...adminAuth, updateSupplierPayment);
 router.delete('/payments/:id', ...adminAuth, deleteSupplierPayment);
 
 module.exports = router;
