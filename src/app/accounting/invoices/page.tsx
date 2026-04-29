@@ -407,11 +407,11 @@ export default function InvoicesPage() {
         <form onSubmit={handlePaymentSubmit} className="space-y-3">
           {!selectedInvoice && (
             <FormField label="Invoice" required>
-              <Select value={paymentForm.invoiceId} onChange={val => setPaymentForm({ ...paymentForm, invoiceId: val})} options={[{ label: "Select invoice", value: "" }, ...invoices.filter(i => i.status !== "paid").map(i => ({ label: `${i.invoiceNo} - ${i.customer.name}`, value: String(i.id) }))]} />
+              <SearchSelect value={paymentForm.invoiceId} onChange={val => setPaymentForm({ ...paymentForm, invoiceId: val})} placeholder="Search invoice..." options={invoices.filter(i => i.status !== "paid").map(i => ({ label: `${i.invoiceNo} - ${i.customer.name}`, value: String(i.id) }))} />
             </FormField>
           )}
           <FormField label="Deposit to Account" required>
-            <Select value={paymentForm.accountId} onChange={val => setPaymentForm({ ...paymentForm, accountId: val})} options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} />
+            <SearchSelect value={paymentForm.accountId} onChange={val => setPaymentForm({ ...paymentForm, accountId: val})} placeholder="Search account..." options={accounts.map(a => ({ label: a.name, value: String(a.id) }))} />
           </FormField>
           <FormField label="Amount" required><Input type="number" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
           <FormField label="Date"><Input type="date" value={paymentForm.paymentDate} onChange={e => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} /></FormField>

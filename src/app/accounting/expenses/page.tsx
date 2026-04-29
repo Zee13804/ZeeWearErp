@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
@@ -212,7 +212,7 @@ export default function ExpensesPage() {
               <Input placeholder="Search by description, category, account or collection…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
             <div className="flex flex-wrap gap-3 bg-background rounded-xl border border-border p-3">
-              <Select value={filter.categoryId} onChange={val => setFilter({ ...filter, categoryId: val})} options={[{ label: "All Categories", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} className="min-w-[150px]" />
+              <SearchSelect value={filter.categoryId} onChange={val => setFilter({ ...filter, categoryId: val})} placeholder="All Categories" options={[{ label: "All Categories", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} className="min-w-[150px]" />
               <Input type="date" value={filter.dateFrom} onChange={e => setFilter({ ...filter, dateFrom: e.target.value })} className="max-w-[150px]" />
               <Input type="date" value={filter.dateTo} onChange={e => setFilter({ ...filter, dateTo: e.target.value })} className="max-w-[150px]" />
               <button onClick={() => setFilter({ categoryId: "", dateFrom: "", dateTo: "" })} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Clear</button>
@@ -300,10 +300,10 @@ export default function ExpensesPage() {
       <Dialog open={showExpenseForm} onClose={() => { setShowExpenseForm(false); setEditingExpenseId(null); }} title={editingExpenseId ? "Edit Expense" : "Add Expense"} description={editingExpenseId ? "Update an existing expense" : "Record a business expense"}>
         <form onSubmit={handleExpenseSubmit} className="space-y-3">
           <FormField label="Category" required>
-            <Select value={expenseForm.categoryId} onChange={val => setExpenseForm({ ...expenseForm, categoryId: val})} options={[{ label: "Select category", value: "" }, ...categories.map(c => ({ label: c.name, value: String(c.id) }))]} />
+            <SearchSelect value={expenseForm.categoryId} onChange={val => setExpenseForm({ ...expenseForm, categoryId: val})} placeholder="Search category..." options={categories.map(c => ({ label: c.name, value: String(c.id) }))} />
           </FormField>
           <FormField label="Pay From Account" required>
-            <Select value={expenseForm.accountId} onChange={val => setExpenseForm({ ...expenseForm, accountId: val})} options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} />
+            <SearchSelect value={expenseForm.accountId} onChange={val => setExpenseForm({ ...expenseForm, accountId: val})} placeholder="Search account..." options={accounts.map(a => ({ label: a.name, value: String(a.id) }))} />
           </FormField>
           <FormField label="Amount" required><Input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
           <FormField label="Description" required><Input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="What was this expense for?" /></FormField>

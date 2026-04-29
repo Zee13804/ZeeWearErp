@@ -91,4 +91,9 @@ body {
   body:has(.printable-area) .printable-area * { visibility: visible !important; }
   /* Inside a printable-area, force-hide anything explicitly marked print:hidden */
   .printable-area .print\:hidden, .printable-area [class*="print:hidden"] { display: none !important; }
+  /* Remove scroll-clipping inside printable-area so all rows print on multiple pages */
+  .printable-area, .printable-area * { max-height: none !important; overflow: visible !important; }
+  .printable-area table { page-break-inside: auto !important; }
+  .printable-area tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+  .printable-area thead { display: table-header-group !important; }
 }

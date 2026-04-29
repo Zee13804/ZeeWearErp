@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
@@ -554,7 +554,7 @@ export default function SuppliersPage() {
         <form onSubmit={handlePurchaseSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Supplier" required>
-              <Select value={purchaseForm.supplierId} onChange={val => setPurchaseForm({ ...purchaseForm, supplierId: val})} options={[{ label: "Select supplier", value: "" }, ...suppliers.map(s => ({ label: s.name, value: String(s.id) }))]} />
+              <SearchSelect value={purchaseForm.supplierId} onChange={val => setPurchaseForm({ ...purchaseForm, supplierId: val})} placeholder="Search supplier..." options={suppliers.map(s => ({ label: s.name, value: String(s.id) }))} />
             </FormField>
             <FormField label="Invoice No"><Input value={purchaseForm.invoiceNo} onChange={e => setPurchaseForm({ ...purchaseForm, invoiceNo: e.target.value })} placeholder="Optional" /></FormField>
           </div>
@@ -602,7 +602,7 @@ export default function SuppliersPage() {
       <Dialog open={showPaymentForm} onClose={() => { setShowPaymentForm(false); setEditingPaymentId(null); }} title={editingPaymentId ? "Edit Supplier Payment" : "Record Supplier Payment"} description={editingPaymentId ? "Update payment details" : "Pay a supplier"} className="max-w-2xl">
         <form onSubmit={handlePaymentSubmit} className="space-y-3">
           <FormField label="Supplier" required>
-            <Select value={paymentForm.supplierId} onChange={val => { setPaymentForm({ ...paymentForm, supplierId: val }); setSelectedBills([]); }} options={[{ label: "Select supplier", value: "" }, ...suppliers.map(s => ({ label: `${s.name} (Rs ${fmt(s.balance)} due)`, value: String(s.id) }))]} />
+            <SearchSelect value={paymentForm.supplierId} onChange={val => { setPaymentForm({ ...paymentForm, supplierId: val }); setSelectedBills([]); }} placeholder="Search supplier..." options={suppliers.map(s => ({ label: `${s.name} (Rs ${fmt(s.balance)} due)`, value: String(s.id) }))} />
           </FormField>
 
           {/* Multi-bill selection panel */}
@@ -631,7 +631,7 @@ export default function SuppliersPage() {
           )}
 
           <FormField label="Pay From Account" required>
-            <Select value={paymentForm.accountId} onChange={val => setPaymentForm({ ...paymentForm, accountId: val})} options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} />
+            <SearchSelect value={paymentForm.accountId} onChange={val => setPaymentForm({ ...paymentForm, accountId: val})} placeholder="Search account..." options={accounts.map(a => ({ label: a.name, value: String(a.id) }))} />
           </FormField>
           <FormField label="Amount" required><Input type="number" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
           <FormField label="Date"><Input type="date" value={paymentForm.paymentDate} onChange={e => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} /></FormField>
