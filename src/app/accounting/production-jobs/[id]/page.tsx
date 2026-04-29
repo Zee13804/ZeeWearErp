@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
@@ -631,11 +631,11 @@ export default function JobDetailPage() {
       <Dialog open={showPaymentForm} title="Record Vendor Payment" onClose={() => setShowPaymentForm(false)}>
         <div className="space-y-4">
           <FormField label="Vendor Name *">
-            <Select
+            <SearchSelect
               value={paymentForm.vendorName}
               onChange={val => setPaymentForm(f => ({ ...f, vendorName: val }))}
+              placeholder="Search vendor..."
               options={[
-                { label: "Select vendor", value: "" },
                 ...vendorNames.map(n => ({ label: n, value: n })),
                 { label: "Other / New vendor", value: "__other__" },
               ]}
@@ -668,13 +668,11 @@ export default function JobDetailPage() {
             />
           </FormField>
           <FormField label="Pay from Account *">
-            <Select
+            <SearchSelect
               value={paymentForm.accountId}
               onChange={val => setPaymentForm(f => ({ ...f, accountId: val }))}
-              options={[
-                { label: "Select account", value: "" },
-                ...accounts.map(a => ({ label: a.name, value: String(a.id) })),
-              ]}
+              placeholder="Search account..."
+              options={accounts.map(a => ({ label: a.name, value: String(a.id) }))}
             />
           </FormField>
           <FormField label="Date">

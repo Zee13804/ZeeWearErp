@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { apiGet } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
 import { Loader2, Download, Printer } from "lucide-react";
@@ -236,7 +236,7 @@ export default function AccountingReportsPage() {
             )}
             {tab === "ledger" && (
               <>
-                <div className="space-y-1"><p className="text-xs text-muted-foreground">Account</p><Select value={ledgerFilter.accountId} onChange={val => setLedgerFilter({ ...ledgerFilter, accountId: val})} options={[{ label: "All Accounts", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} className="w-[160px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Account</p><SearchSelect value={ledgerFilter.accountId} onChange={val => setLedgerFilter({ ...ledgerFilter, accountId: val})} placeholder="All Accounts" options={[{ label: "All Accounts", value: "" }, ...accounts.map(a => ({ label: a.name, value: String(a.id) }))]} className="w-[160px]" /></div>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={ledgerFilter.dateFrom} onChange={e => setLedgerFilter({ ...ledgerFilter, dateFrom: e.target.value })} className="w-[150px]" /></div>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={ledgerFilter.dateTo} onChange={e => setLedgerFilter({ ...ledgerFilter, dateTo: e.target.value })} className="w-[150px]" /></div>
               </>
@@ -314,7 +314,7 @@ export default function AccountingReportsPage() {
             )}
             {tab === "supplier-ledger" && (
               <>
-                <div className="space-y-1"><p className="text-xs text-muted-foreground">Supplier</p><Select value={supplierLedgerFilter.supplierId} onChange={val => setSupplierLedgerFilter({ ...supplierLedgerFilter, supplierId: val })} options={[{ label: "All Suppliers", value: "" }, ...supplierList.map(s => ({ label: s.name, value: String(s.id) }))]} className="w-[180px]" /></div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Supplier</p><SearchSelect value={supplierLedgerFilter.supplierId} onChange={val => setSupplierLedgerFilter({ ...supplierLedgerFilter, supplierId: val })} placeholder="All Suppliers" options={[{ label: "All Suppliers", value: "" }, ...supplierList.map(s => ({ label: s.name, value: String(s.id) }))]} className="w-[180px]" /></div>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">From</p><Input type="date" value={supplierLedgerFilter.from} onChange={e => setSupplierLedgerFilter({ ...supplierLedgerFilter, from: e.target.value })} className="w-[150px]" /></div>
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">To</p><Input type="date" value={supplierLedgerFilter.to} onChange={e => setSupplierLedgerFilter({ ...supplierLedgerFilter, to: e.target.value })} className="w-[150px]" /></div>
               </>

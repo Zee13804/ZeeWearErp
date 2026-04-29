@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
@@ -514,11 +514,11 @@ export default function EmployeesPage() {
       <Dialog open={showAdvanceForm} onClose={() => setShowAdvanceForm(false)} title="Record Advance" description="Record advance payment to employee">
         <form onSubmit={handleAdvanceSubmit} className="space-y-3">
           <FormField label="Employee" required>
-            <Select value={advanceForm.employeeId} onChange={val => setAdvanceForm({ ...advanceForm, employeeId: val })} options={[{ label: "Select employee", value: "" }, ...employees.map(e => ({ label: e.name, value: String(e.id) }))]} />
+            <SearchSelect value={advanceForm.employeeId} onChange={val => setAdvanceForm({ ...advanceForm, employeeId: val })} placeholder="Search employee..." options={employees.map(e => ({ label: e.name, value: String(e.id) }))} />
           </FormField>
           <FormField label="Amount (Rs)" required><Input type="number" value={advanceForm.amount} onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
           <FormField label="Debit from Account" required>
-            <Select value={advanceForm.accountId} onChange={val => setAdvanceForm({ ...advanceForm, accountId: val })} options={accountOptions} />
+            <SearchSelect value={advanceForm.accountId} onChange={val => setAdvanceForm({ ...advanceForm, accountId: val })} placeholder="Search account..." options={accountOptions} />
           </FormField>
           <FormField label="Reason"><Input value={advanceForm.reason} onChange={e => setAdvanceForm({ ...advanceForm, reason: e.target.value })} placeholder="Optional reason" /></FormField>
           <FormField label="Date"><Input type="date" value={advanceForm.advanceDate} onChange={e => setAdvanceForm({ ...advanceForm, advanceDate: e.target.value })} /></FormField>
@@ -533,11 +533,11 @@ export default function EmployeesPage() {
       <Dialog open={showSalaryForm} onClose={() => { setShowSalaryForm(false); setInvoiceBalance(null); }} title="Salary Record" description="Create a monthly salary record">
         <form onSubmit={handleSalarySubmit} className="space-y-3">
           <FormField label="Employee" required>
-            <Select value={salaryForm.employeeId} onChange={val => {
+            <SearchSelect value={salaryForm.employeeId} onChange={val => {
               const emp = employees.find(em => em.id === parseInt(val));
               setSalaryForm({ ...salaryForm, employeeId: val, baseSalary: emp ? String(emp.monthlySalary) : salaryForm.baseSalary, advanceDeducted: emp ? String(emp.advanceBalance) : "0", absenceDays: "0", invoiceDeducted: "0" });
               fetchInvoiceBalance(val);
-            }} options={[{ label: "Select employee", value: "" }, ...employees.map(e => ({ label: `${e.name} (Rs ${fmt(e.monthlySalary)}/mo)`, value: String(e.id) }))]} />
+            }} placeholder="Search employee..." options={employees.map(e => ({ label: `${e.name} (Rs ${fmt(e.monthlySalary)}/mo)`, value: String(e.id) }))} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Month">
@@ -624,7 +624,7 @@ export default function EmployeesPage() {
             </div>
           )}
           <FormField label="Pay From Account" required>
-            <Select value={salaryForm.accountId} onChange={val => setSalaryForm({ ...salaryForm, accountId: val })} options={accountOptions} />
+            <SearchSelect value={salaryForm.accountId} onChange={val => setSalaryForm({ ...salaryForm, accountId: val })} placeholder="Search account..." options={accountOptions} />
           </FormField>
           <FormField label="Note"><Input value={salaryForm.note} onChange={e => setSalaryForm({ ...salaryForm, note: e.target.value })} placeholder="Optional note" /></FormField>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -645,7 +645,7 @@ export default function EmployeesPage() {
           <FormField label="Description"><Input value={labourForm.description} onChange={e => setLabourForm({ ...labourForm, description: e.target.value })} placeholder="Type of work done" /></FormField>
           <FormField label="Amount (Rs)" required><Input type="number" value={labourForm.amount} onChange={e => setLabourForm({ ...labourForm, amount: e.target.value })} placeholder="0.00" min="0.01" step="0.01" /></FormField>
           <FormField label="Pay From Account" required>
-            <Select value={labourForm.accountId} onChange={val => setLabourForm({ ...labourForm, accountId: val })} options={accountOptions} />
+            <SearchSelect value={labourForm.accountId} onChange={val => setLabourForm({ ...labourForm, accountId: val })} placeholder="Search account..." options={accountOptions} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Week Start"><Input type="date" value={labourForm.weekStart} onChange={e => setLabourForm({ ...labourForm, weekStart: e.target.value })} /></FormField>
@@ -669,7 +669,7 @@ export default function EmployeesPage() {
             </div>
           )}
           <FormField label="Debit from Account" required>
-            <Select value={markPaidAccountId} onChange={val => setMarkPaidAccountId(val)} options={accountOptions} />
+            <SearchSelect value={markPaidAccountId} onChange={val => setMarkPaidAccountId(val)} placeholder="Search account..." options={accountOptions} />
           </FormField>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => setMarkPaidTarget(null)} className="cursor-pointer">Cancel</Button>

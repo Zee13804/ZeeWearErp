@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Dialog, FormField, ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchSelect } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
@@ -471,12 +471,14 @@ export default function AccountsPage() {
       <Dialog open={showTransfer} onClose={() => setShowTransfer(false)} title="Transfer Between Accounts" description="Move funds between accounts">
         <form onSubmit={handleTransfer} className="space-y-4">
           <FormField label="From Account" required>
-            <Select value={transferForm.fromAccountId} onChange={val => setTransferForm({ ...transferForm, fromAccountId: val })}
-              options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: `${typeIcon[a.type] || "🪙"} ${a.name} (Rs ${fmt(a.balance)})`, value: String(a.id) }))]} />
+            <SearchSelect value={transferForm.fromAccountId} onChange={val => setTransferForm({ ...transferForm, fromAccountId: val })}
+              placeholder="Search account..."
+              options={accounts.map(a => ({ label: `${typeIcon[a.type] || "🪙"} ${a.name} (Rs ${fmt(a.balance)})`, value: String(a.id) }))} />
           </FormField>
           <FormField label="To Account" required>
-            <Select value={transferForm.toAccountId} onChange={val => setTransferForm({ ...transferForm, toAccountId: val })}
-              options={[{ label: "Select account", value: "" }, ...accounts.map(a => ({ label: `${typeIcon[a.type] || "🪙"} ${a.name}`, value: String(a.id) }))]} />
+            <SearchSelect value={transferForm.toAccountId} onChange={val => setTransferForm({ ...transferForm, toAccountId: val })}
+              placeholder="Search account..."
+              options={accounts.map(a => ({ label: `${typeIcon[a.type] || "🪙"} ${a.name}`, value: String(a.id) }))} />
           </FormField>
           <FormField label="Amount" required>
             <Input type="number" min="0.01" step="0.01" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} placeholder="0.00" />

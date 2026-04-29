@@ -4,8 +4,9 @@ import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { apiGet } from "@/lib/api";
 import { showToast } from "@/components/ui/toast";
-import { Loader2, ArrowLeft, Users, ChevronDown, ChevronRight, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, Users, ChevronDown, ChevronRight, CheckCircle, AlertCircle, ExternalLink, Printer } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface JobBreakdown {
   jobId: number;
@@ -32,10 +33,13 @@ function fmt(n: number) {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+interface CompanyInfo { name?: string; tagline?: string; address?: string; phone?: string; email?: string }
+
 export default function VendorLedgerPage() {
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [company, setCompany] = useState<CompanyInfo>({ name: "Zee Wear" });
 
   const load = async () => {
     setLoading(true);
@@ -49,7 +53,16 @@ export default function VendorLedgerPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    apiGet("/accounting/settings").then(s => setCompany({
+      name: s.companyName || "Zee Wear",
+      tagline: s.companyTagline,
+      address: s.companyAddress,
+      phone: s.companyPhone,
+      email: s.companyEmail,
+    })).catch(() => {});
+  }, []);
 
   const toggle = (name: string) => {
     setExpanded(prev => {
@@ -65,10 +78,12 @@ export default function VendorLedgerPage() {
   const totalPaid = vendors.reduce((s, v) => s + v.totalReceived, 0);
   const pendingVendors = vendors.filter(v => v.balance > 0).length;
 
+  const printLedger = () => window.print();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 print:hidden">
           <Link
             href="/accounting/production-jobs"
             className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -79,7 +94,28 @@ export default function VendorLedgerPage() {
             <h1 className="text-2xl font-bold text-foreground">Vendor Ledger</h1>
             <p className="text-muted-foreground mt-1 text-sm">All vendors across all production jobs</p>
           </div>
+          <Button variant="outline" size="sm" onClick={printLedger} className="gap-2 cursor-pointer">
+            <Printer className="w-4 h-4" /> Print
+          </Button>
         </div>
+
+        <div className="printable-area space-y-6">
+          <div className="hidden print:block mb-4 pb-3 border-b border-gray-300">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-bold">{company.name || "Zee Wear"}</h2>
+                {company.tagline && <p className="text-xs text-gray-600">{company.tagline}</p>}
+                {company.address && <p className="text-xs">{company.address}</p>}
+                {(company.phone || company.email) && (
+                  <p className="text-xs">{[company.phone, company.email].filter(Boolean).join(" · ")}</p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold">Vendor Ledger</p>
+                <p className="text-xs text-gray-600">Printed: {new Date().toLocaleString("en-PK")}</p>
+              </div>
+            </div>
+          </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-background rounded-xl border border-border p-4">
@@ -259,6 +295,7 @@ export default function VendorLedgerPage() {
             </table>
           </div>
         )}
+        </div>
       </div>
     </DashboardLayout>
   );
