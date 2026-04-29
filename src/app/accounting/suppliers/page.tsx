@@ -245,11 +245,26 @@ export default function SuppliersPage() {
     setShowPaymentForm(true);
   };
 
-  // Bills shown in payment form (for the chosen supplier)
+  // Bills shown in payment form (for the chosen supplier) — only unpaid/partially-paid bills.
+  // Payments are allocated FIFO (oldest bill first) since there's no explicit bill-payment link.
   const supplierBills = useMemo(() => {
     if (!paymentForm.supplierId) return [];
-    return purchases.filter(p => p.supplierId === parseInt(paymentForm.supplierId));
-  }, [paymentForm.supplierId, purchases]);
+    const sid = parseInt(paymentForm.supplierId);
+    const bills = purchases
+      .filter(p => p.supplierId === sid)
+      .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+    let pool = payments
+      .filter(p => p.supplierId === sid)
+      .reduce((s, p) => s + (p.amount || 0), 0);
+    return bills
+      .map(b => {
+        const applied = Math.min(pool, b.totalAmount);
+        pool -= applied;
+        const remaining = b.totalAmount - applied;
+        return { ...b, totalAmount: remaining };
+      })
+      .filter(b => b.totalAmount > 0.009);
+  }, [paymentForm.supplierId, purchases, payments]);
 
   const toggleBill = (purchaseId: number, amt: number, invNo?: string) => {
     let next: number[];
